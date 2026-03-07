@@ -1,0 +1,14 @@
+{
+  "name": "nightly-evolution",
+  "created_at": "2026-03-06T02:12:00Z",
+  "active": false,
+  "worker_model": "opus",
+  "planner_model": "opus",
+  "budget_daily": 50,
+  "tasks_today": 12,
+  "budget_date": "2026-03-06",
+  "worker_agent": "evo",
+  "worker_timeout": 180,
+  "daily_task_budget": 20,
+  "recurring": true
+}

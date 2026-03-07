@@ -1,0 +1,52 @@
+# PROJECT_NAME — SPEC
+
+## Background
+
+Why this project exists.
+
+## Iron Rules
+
+- ALL output files in English (unless specified otherwise)
+- Tasks must be self-contained (no MCP plugins in headless mode)
+- Each task produces exactly ONE output file
+
+## Goals
+
+1. Goal one
+2. Goal two
+3. Goal three
+
+## Constraints
+
+- Only synthesize from `raw/` files (if applicable)
+- Do not make external API calls during execution
+- Keep each output file under 50KB
+
+## Phase 1: Research
+
+| ID | Title | Depends On | Output |
+|----|-------|------------|--------|
+| 1.1 | Task one | — | `knowledge/one.md` |
+| 1.2 | Task two | — | `knowledge/two.md` |
+| 1.G | Gate: Phase 1 complete | 1.1, 1.2 | — |
+
+Gate conditions: All knowledge/ files exist and are non-empty.
+
+## Phase 2: Synthesis
+
+| ID | Title | Depends On | Output |
+|----|-------|------------|--------|
+| 2.1 | Synthesize from phase 1 | 1.G | `output/synthesis.md` |
+| 2.G | Gate: Phase 2 complete | 2.1 | — |
+
+Gate conditions: output/synthesis.md exists and >= 1KB.
+
+## Output Structure
+
+```
+output/
+├── synthesis.md
+knowledge/
+├── one.md
+└── two.md
+```

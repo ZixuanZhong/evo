@@ -1,0 +1,423 @@
+#!/usr/bin/env bash
+# evo — Evolution Loop CLI
+# Usage: evo <command> [args]
+set -uo pipefail
+
+EVO_ROOT="${EVO_ROOT:-$HOME/.openclaw/evo}"
+
+# Load .env if present (user-local config)
+if [[ -f "$EVO_ROOT/.env" ]]; then
+  set -a
+  source "$EVO_ROOT/.env"
+  set +a
+fi
+FRAMEWORK_DIR="$EVO_ROOT/framework"
+SCRIPTS_DIR="$FRAMEWORK_DIR/scripts"
+TEMPLATES_DIR="$FRAMEWORK_DIR/templates"
+INSTANCES_DIR="$EVO_ROOT/instances"
+
+# ─── Helpers ─────────────────────────────────────────
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+pid_file() {
+  local name="$1" role="$2"
+  echo "$INSTANCES_DIR/$name/logs/${role}.pid"
+}
+
+is_running() {
+  local pf="$1"
+  [[ -f "$pf" ]] && kill -0 "$(cat "$pf")" 2>/dev/null
+}
+
+ensure_instance() {
+  local name="$1"
+  [[ -d "$INSTANCES_DIR/$name" ]] || die "Instance '$name' not found. Use 'evo create' first."
+}
+
+# ─── Commands ────────────────────────────────────────
+
+cmd_create() {
+  local name="${1:-}"
+  local desc="${2:-}"
+  [[ -n "$name" ]] || die "Usage: evo create <name> \"<description>\""
+
+  local inst_dir="$INSTANCES_DIR/$name"
+  [[ ! -d "$inst_dir" ]] || die "Instance '$name' already exists"
+
+  mkdir -p "$inst_dir"/{specs,raw,output,knowledge,logs,reports}
+
+  # Create tasks.json from template
+  sed "s/PROJECT_NAME/$name/g" "$TEMPLATES_DIR/tasks.json.template" > "$inst_dir/tasks.json"
+
+  # Create state.json
+  local now
+  now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+  local today
+  today=$(date '+%Y-%m-%d')
+  sed -e "s/PROJECT_NAME/$name/g" \
+      -e "s/CREATED_AT/$now/g" \
+      -e "s/CREATED_DATE/$today/g" \
+      "$TEMPLATES_DIR/state.json.template" > "$inst_dir/state.json"
+
+  # Create SPEC.md from template
+  sed "s/PROJECT_NAME/$name/g" "$TEMPLATES_DIR/SPEC.md.template" > "$inst_dir/SPEC.md"
+
+  echo "Created instance: $name"
+  echo "  Directory: $inst_dir"
+  echo "  Next: edit $inst_dir/SPEC.md, then run 'evo start $name'"
+}
+
+cmd_start() {
+  local name="${1:-}"
+  [[ -n "$name" ]] || die "Usage: evo start <name>"
+  ensure_instance "$name"
+
+  local inst_dir="$INSTANCES_DIR/$name"
+  local wpf
+  wpf=$(pid_file "$name" "worker")
+
+  if is_running "$wpf"; then
+    echo "Worker already running (PID $(cat "$wpf"))"
+    return 0
+  fi
+
+  # Clean up any stale worker/claude processes for this instance
+  pkill -f "worker-loop.sh $name" 2>/dev/null || true
+  pkill -f "claude.*${name}" 2>/dev/null || true
+  sleep 1
+
+  # Set active
+  python3 -c "
+import json, tempfile, os
+p = '$inst_dir/state.json'
+d = json.load(open(p))
+d['active'] = True
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), suffix='.tmp')
+with os.fdopen(fd, 'w') as f:
+    json.dump(d, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+os.rename(tmp, p)
+"
+
+  # Start Worker
+  nohup bash "$SCRIPTS_DIR/worker-loop.sh" "$name" \
+    >> "$inst_dir/logs/worker.log" 2>&1 &
+  echo $! > "$wpf"
+  disown
+
+  echo "Started worker for '$name' (PID $(cat "$wpf"))"
+}
+
+cmd_stop() {
+  local name="${1:-}"
+  [[ -n "$name" ]] || die "Usage: evo stop <name>"
+  ensure_instance "$name"
+
+  local inst_dir="$INSTANCES_DIR/$name"
+
+  # Set inactive
+  python3 -c "
+import json, tempfile, os
+p = '$inst_dir/state.json'
+d = json.load(open(p))
+d['active'] = False
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), suffix='.tmp')
+with os.fdopen(fd, 'w') as f:
+    json.dump(d, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+os.rename(tmp, p)
+"
+
+  # Kill worker
+  local wpf
+  wpf=$(pid_file "$name" "worker")
+  if is_running "$wpf"; then
+    kill "$(cat "$wpf")" 2>/dev/null || true
+    rm -f "$wpf"
+    echo "Stopped worker for '$name'"
+  else
+    echo "Worker not running for '$name'"
+  fi
+}
+
+cmd_status() {
+  local name="${1:-}"
+  local format="--text"
+
+  # Check for --json flag
+  if [[ "$name" == "--json" ]]; then
+    bash "$SCRIPTS_DIR/reporter.sh" --json
+    return
+  fi
+
+  if [[ -n "$name" ]]; then
+    ensure_instance "$name"
+    # Check worker process
+    local wpf
+    wpf=$(pid_file "$name" "worker")
+    if is_running "$wpf"; then
+      echo "Worker: running (PID $(cat "$wpf"))"
+    else
+      echo "Worker: stopped"
+    fi
+    # Check circuit breaker / completion
+    if [[ -f "$INSTANCES_DIR/$name/logs/circuit-breaker.json" ]]; then
+      echo "WARNING: Circuit breaker tripped"
+    fi
+    if [[ -f "$INSTANCES_DIR/$name/logs/completed.json" ]]; then
+      echo "Status: COMPLETED"
+    fi
+    echo ""
+    bash "$SCRIPTS_DIR/reporter.sh" --detail "$name"
+  else
+    # List all instances
+    bash "$SCRIPTS_DIR/reporter.sh" --text
+  fi
+}
+
+cmd_logs() {
+  local name="${1:-}"
+  [[ -n "$name" ]] || die "Usage: evo logs <name> [--follow] [--tail N]"
+  ensure_instance "$name"
+
+  local log_file="$INSTANCES_DIR/$name/logs/worker.log"
+  [[ -f "$log_file" ]] || die "No log file found"
+
+  shift
+  local follow=false
+  local tail_n=50
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --follow|-f) follow=true ;;
+      --tail) tail_n="${2:-50}"; shift ;;
+      *) ;;
+    esac
+    shift
+  done
+
+  if [[ "$follow" == "true" ]]; then
+    tail -f "$log_file"
+  else
+    tail -n "$tail_n" "$log_file"
+  fi
+}
+
+cmd_plan() {
+  local name="${1:-}"
+  [[ -n "$name" ]] || die "Usage: evo plan <name>"
+  ensure_instance "$name"
+
+  bash "$SCRIPTS_DIR/planner.sh" "$INSTANCES_DIR/$name"
+}
+
+cmd_destroy() {
+  local name="${1:-}"
+  [[ -n "$name" ]] || die "Usage: evo destroy <name>"
+  ensure_instance "$name"
+
+  # Stop first
+  cmd_stop "$name" 2>/dev/null || true
+
+  # Move to trash (recoverable)
+  local inst_dir="$INSTANCES_DIR/$name"
+  local trash_dir="$HOME/.Trash/evo-$name-$(date +%s)"
+  mv "$inst_dir" "$trash_dir"
+  echo "Instance '$name' moved to trash: $trash_dir"
+}
+
+cmd_bootstrap() {
+  # Restore all active instances after reboot
+  local count=0
+  for dir in "$INSTANCES_DIR"/*/; do
+    [[ -d "$dir" ]] || continue
+    local name
+    name=$(basename "$dir")
+    local state_file="$dir/state.json"
+    [[ -f "$state_file" ]] || continue
+
+    local active
+    active=$(python3 -c "import json; print(json.load(open('$state_file')).get('active', False))" 2>/dev/null || echo "False")
+
+    if [[ "$active" == "True" ]]; then
+      local wpf
+      wpf=$(pid_file "$name" "worker")
+      if ! is_running "$wpf"; then
+        echo "Restoring worker for '$name'..."
+        nohup bash "$SCRIPTS_DIR/worker-loop.sh" "$name" \
+          >> "$dir/logs/worker.log" 2>&1 &
+        echo $! > "$wpf"
+        disown
+        count=$((count + 1))
+      fi
+    fi
+  done
+
+  if [[ $count -eq 0 ]]; then
+    echo "No instances to restore"
+  else
+    echo "Restored $count instance(s)"
+  fi
+}
+
+cmd_reset() {
+  local name="${1:-}"
+  local force=false
+  # Parse --force flag
+  for arg in "$@"; do
+    [[ "$arg" == "--force" ]] && force=true
+  done
+  [[ -n "$name" ]] || die "Usage: evo reset <name> [--force]"
+  ensure_instance "$name"
+
+  local inst_dir="$INSTANCES_DIR/$name"
+
+  # Check if worker is running — refuse unless --force or stale
+  local wpf
+  wpf=$(pid_file "$name" "worker")
+  if is_running "$wpf"; then
+    local pid
+    pid=$(cat "$wpf")
+    # Check how long the worker has been running (seconds) — macOS compatible
+    local elapsed
+    elapsed=$(python3 -c "
+import subprocess, re, time
+out = subprocess.check_output(['ps', '-o', 'lstart=', '-p', '$pid'], text=True).strip()
+# Parse 'Day Mon DD HH:MM:SS YYYY'
+import email.utils, calendar
+from datetime import datetime
+dt = datetime.strptime(out, '%a %b %d %H:%M:%S %Y')
+print(int(time.time() - dt.timestamp()))
+" 2>/dev/null || echo "0")
+    local max_age=3600  # 1 hour — if older, treat as stale
+
+    if [[ "$force" == "true" ]]; then
+      echo "Force reset: killing worker (PID $pid, running ${elapsed}s)"
+      kill "$pid" 2>/dev/null || true
+      rm -f "$wpf"
+      sleep 1
+    elif [[ "$elapsed" -gt "$max_age" ]]; then
+      echo "Worker stale (PID $pid, running ${elapsed}s > ${max_age}s). Killing."
+      kill "$pid" 2>/dev/null || true
+      rm -f "$wpf"
+      sleep 1
+    else
+      echo "Worker is running (PID $pid, ${elapsed}s). Skipping reset."
+      echo "Use 'evo reset $name --force' to kill and reset."
+      return 0
+    fi
+  fi
+
+  # Check for template to rebuild tasks
+  local tmpl_dir="$FRAMEWORK_DIR/templates/$name"
+  if [[ -f "$tmpl_dir/tasks.json" ]]; then
+    # Rebuild from template
+    cp "$tmpl_dir/tasks.json" "$inst_dir/tasks.json"
+    echo "Reset tasks from template: $tmpl_dir/tasks.json"
+  else
+    # Reset in-place: all tasks → pending, clear attempts/output
+    python3 -c "
+import json, tempfile, os
+p = '$inst_dir/tasks.json'
+d = json.load(open(p))
+for t in d.get('tasks', []):
+    t['status'] = 'pending'
+    t['attempts'] = 0
+    t.pop('output_file', None)
+    t.pop('started_at', None)
+    t.pop('completed_at', None)
+    t.pop('error', None)
+total = len(d.get('tasks', []))
+d['summary'] = {'total': total, 'pending': total, 'in_progress': 0, 'done': 0, 'failed': 0, 'escalated': 0}
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), suffix='.tmp')
+with os.fdopen(fd, 'w') as f:
+    json.dump(d, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+os.rename(tmp, p)
+print(f'Reset {total} tasks to pending (in-place)')
+"
+  fi
+
+  # Clear completion markers
+  rm -f "$inst_dir/logs/completed.json"
+  rm -f "$inst_dir/logs/archived.flag"
+  rm -f "$inst_dir/logs/circuit-breaker.json"
+
+  # Set active = false (start will set true)
+  python3 -c "
+import json, tempfile, os
+p = '$inst_dir/state.json'
+d = json.load(open(p))
+d['active'] = False
+d['tasks_today'] = 0
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), suffix='.tmp')
+with os.fdopen(fd, 'w') as f:
+    json.dump(d, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+os.rename(tmp, p)
+"
+
+  echo "Instance '$name' reset. Run 'evo start $name' to begin."
+}
+
+cmd_integrate() {
+  local name="${1:-}"
+  [[ -n "$name" ]] || die "Usage: evo integrate <name>"
+  ensure_instance "$name"
+
+  bash "$SCRIPTS_DIR/integrate.sh" "$name"
+}
+
+cmd_health() {
+  bash "$SCRIPTS_DIR/health_check.sh"
+}
+
+cmd_help() {
+  cat <<'EOF'
+evo — Evolution Loop CLI
+
+Usage: evo <command> [args]
+
+Commands:
+  create <name> "<desc>"   Create new instance
+  start <name>             Start Worker loop
+  stop <name>              Stop Worker loop
+  status [name]            Show status (all or one)
+  logs <name> [--follow]   View Worker logs
+  plan <name>              Manually trigger Planner
+  reset <name>             Reset all tasks to pending (for recurring instances)
+  integrate <name>         Phase 5: show integration routing for outputs
+  health                   System health check (JSON)
+  destroy <name>           Stop + trash instance
+  bootstrap                Restore active instances after reboot
+
+Environment:
+  EVO_ROOT             Base directory (default: ~/.openclaw/evo)
+  EVO_DISCORD_CHANNEL  Discord channel ID for notifications (optional)
+  EVO_MENTION          Discord mention tag, e.g. <@USER_ID> (optional)
+  EVO_ARCHIVE_REPO     GitHub repo for archiving, e.g. user/repo (optional)
+  OPENCLAW_WORKSPACE   OpenClaw workspace path (default: ~/.openclaw/workspace)
+EOF
+}
+
+# ─── Main ────────────────────────────────────────────
+
+command="${1:-help}"
+shift 2>/dev/null || true
+
+case "$command" in
+  create)    cmd_create "$@" ;;
+  start)     cmd_start "$@" ;;
+  stop)      cmd_stop "$@" ;;
+  status)    cmd_status "$@" ;;
+  logs)      cmd_logs "$@" ;;
+  plan)      cmd_plan "$@" ;;
+  reset)     cmd_reset "$@" ;;
+  integrate) cmd_integrate "$@" ;;
+  health)    cmd_health ;;
+  destroy)   cmd_destroy "$@" ;;
+  bootstrap) cmd_bootstrap ;;
+  help|--help|-h) cmd_help ;;
+  *)         die "Unknown command: $command. Run 'evo help' for usage." ;;
+esac

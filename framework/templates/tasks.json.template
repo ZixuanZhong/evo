@@ -1,0 +1,17 @@
+{
+  "project_name": "PROJECT_NAME",
+  "plan_version": 0,
+  "phase": "",
+  "planned_at": null,
+  "planned_by": null,
+  "planner_trigger": true,
+  "tasks": [],
+  "summary": {
+    "total": 0,
+    "pending": 0,
+    "in_progress": 0,
+    "done": 0,
+    "failed": 0,
+    "escalated": 0
+  }
+}

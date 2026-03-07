@@ -1,0 +1,13 @@
+{
+  "name": "PROJECT_NAME",
+  "created_at": "CREATED_AT",
+  "active": false,
+  "worker_model": "sonnet",
+  "planner_model": "opus",
+  "budget_daily": 50,
+  "tasks_today": 0,
+  "budget_date": "CREATED_DATE",
+  "worker_agent": "evo",
+  "worker_timeout": 600,
+  "daily_task_budget": 20
+}

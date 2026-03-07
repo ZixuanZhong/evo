@@ -1,0 +1,13 @@
+# Instance runtime files
+instances/*/logs/*.log
+instances/*/logs/*.log.*
+instances/*/logs/.worker-prompt-*
+instances/*/logs/worker.pid
+instances/*/*.lock
+*.tmp
+
+# Environment (may contain secrets)
+.env
+
+# macOS
+.DS_Store

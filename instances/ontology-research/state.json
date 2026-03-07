@@ -1,0 +1,13 @@
+{
+  "name": "ontology-research",
+  "created_at": "2026-03-05T08:21:53Z",
+  "active": false,
+  "worker_model": "opus",
+  "planner_model": "opus",
+  "budget_daily": 50,
+  "tasks_today": 39,
+  "budget_date": "2026-03-05",
+  "worker_timeout": 900,
+  "daily_task_budget": 20,
+  "worker_agent": "evo"
+}
