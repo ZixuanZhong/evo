@@ -1,42 +1,25 @@
-# Nightly Evolution 摘要 — 2026-03-06
+# Nightly Evolution 摘要 — 2026-03-07
 
-## 任务完成: 12/12 ✅
+## 任务: 12/12 ✅
 
-| Phase | Tasks | Status |
-|-------|-------|--------|
-| 0: Workspace 扫描 | 0.1 | ✅ |
-| 1: Workspace 维护 | 1.1–1.4 | ✅ |
-| 2: Memory 蒸馏 | 2.1–2.2 | ✅ |
-| 3: 社区调研 | 3.1–3.3 | ✅ |
-| 4: 产出 | 4.1, 4.G | ✅ |
+| Phase | 任务 | 状态 |
+|-------|------|------|
+| 0 | Workspace 扫描 | ✅ |
+| 1 | 核心文件/playbooks/symlinks/health | ✅ |
+| 2 | Memory 蒸馏 / SHARED-FACTS 同步 | ✅ (无新内容) |
+| 3 | 社区调研 x3 | ✅ |
+| 4 | Git push + Discord | ✅ |
 
 ## 关键发现
 
-### Workspace
-- 188 files, 0 stale
-- 核心文件/playbooks/symlinks 全部健康
+- **Workspace**: 193 files, 0 stale
+- **Cron**: 4 异常 (log-hourly-location 6次超时最严重)
+- **安全**: ClawHub 341 恶意技能 (11.4%)，Cisco/Koi Security 报告
+- **AI**: GPT-5.3-Codex + Windows 版发布，Cursor 独立代理工具
+- **Git**: workspace + workspace-log 有更新并推送
 
-### Cron 异常
-- 🔴 **log-workflowy-check**: consecutiveErrors=3 (timeout 180s)
-- 🟡 **alpha-pre-market-check**: consecutiveErrors=1 (message failed)
-
-### Memory 更新
-- MEMORY.md: +6 active context, +4 lessons, +timezone section, +4 open items
-- SHARED-FACTS.md: 1 superseded, +3 new cross-agent facts
-
-### 社区
-- OpenClaw v2026.3.2 最新 ✅ | 7 CVEs 披露 (5/7 不受影响)
-- GPT-5.4 发布 (Computer Use + 金融插件)
-- Apple M5 Pro/Max (LLM 4x faster)
-- Google Workspace CLI (agent-ready)
-- Alpaca unicorn ($1.15B)
-
-### Git
-- openclaw-workspace → e9a91ec
-- openclaw-workspace-alpha → 10f0899
-
-## Discord 投递
-- Message ID: 1479429631458279486
+## Discord
+- Message ID: 1479753563738738801
 - Channel: #main (1477311294368645365)
 
 ---

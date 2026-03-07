@@ -316,9 +316,16 @@ Tasks file: $TASKS_FILE"
   echo "$PROMPT" > "$PROMPT_FILE"
   worker_exit=0
 
+  # Hard timeout: WORKER_TIMEOUT + 30s grace for cleanup
+  # This kills the process tree if openclaw agent's own timeout doesn't work
+  HARD_TIMEOUT=$((WORKER_TIMEOUT + 30))
+
+  # Clean stale session locks before starting (prevents lock contention from prior crashes)
+  find "$HOME/.openclaw/agents/${WORKER_AGENT}/sessions/" -name "*.lock" -mmin +5 -delete 2>/dev/null || true
+
   if [[ "$task_runner" == "claude" ]]; then
     # ─── claude -p: local-only, no web, fast, no session overhead ───
-    log "Executing via claude -p (runner=claude), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s"
+    log "Executing via claude -p (runner=claude), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
     (
       unset CLAUDECODE 2>/dev/null || true
       cd "$INSTANCE_DIR"
@@ -327,18 +334,41 @@ Tasks file: $TASKS_FILE"
         --output-format text \
         --max-turns 50 \
         --model "$WORKER_MODEL" 2>&1
-    ) >> "$LOG_FILE" 2>&1 || worker_exit=$?
+    ) >> "$LOG_FILE" 2>&1 &
+    WORKER_PID=$!
   else
     # ─── openclaw agent: full tools (web_search, web_fetch, memory, plugins) ───
-    log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s"
+    log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
     SESSION_ID="evo-${INSTANCE_NAME}-${task_id}-$(date +%s)"
     openclaw agent \
       --agent "$WORKER_AGENT" \
       --session-id "$SESSION_ID" \
       --message "You are a research Worker in an Evolution Loop. Read the task prompt file and execute it: $PROMPT_FILE" \
       --timeout "$WORKER_TIMEOUT" \
-      2>>"$LOG_FILE" >> "$LOG_FILE" || worker_exit=$?
+      2>>"$LOG_FILE" >> "$LOG_FILE" &
+    WORKER_PID=$!
   fi
+
+  # ─── Hard timeout watchdog ───
+  (
+    sleep "$HARD_TIMEOUT"
+    if kill -0 "$WORKER_PID" 2>/dev/null; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] [HARD-TIMEOUT] Killing worker PID $WORKER_PID after ${HARD_TIMEOUT}s" >> "$LOG_FILE"
+      # Kill process group to catch child processes too
+      kill -TERM "$WORKER_PID" 2>/dev/null
+      sleep 5
+      kill -9 "$WORKER_PID" 2>/dev/null
+    fi
+  ) &
+  WATCHDOG_PID=$!
+
+  # Wait for worker to finish (or be killed by watchdog)
+  wait "$WORKER_PID" 2>/dev/null
+  worker_exit=$?
+
+  # Cancel watchdog if worker finished on its own
+  kill "$WATCHDOG_PID" 2>/dev/null
+  wait "$WATCHDOG_PID" 2>/dev/null
 
   rm -f "$PROMPT_FILE" 2>/dev/null
 

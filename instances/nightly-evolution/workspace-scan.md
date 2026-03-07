@@ -1,6 +1,6 @@
 # Workspace 扫描报告
 
-**扫描时间**: 2026-03-06 10:30 UTC
+**扫描时间**: 2026-03-07 01:44 UTC
 **Stale 阈值**: 7 天未修改
 
 ## workspace-alpha (11 files, 0 stale)
@@ -9,17 +9,17 @@
 |------|------|---------|------|
 | `.gitignore` | 177B | 2026-03-05 03:45 | ✅ fresh |
 | `.openclaw/workspace-state.json` | 74B | 2026-03-03 10:09 | ✅ fresh |
-| `AGENTS.md` | 9.8KB | 2026-03-06 05:48 | ✅ fresh |
+| `AGENTS.md` | 10.1KB | 2026-03-07 00:21 | ✅ fresh |
 | `HEARTBEAT.md` | 57B | 2026-03-03 08:00 | ✅ fresh |
 | `IDENTITY.md` | 208B | 2026-03-03 08:00 | ✅ fresh |
-| `SHARED-FACTS.md` | 4.8KB | 2026-03-06 10:27 | ✅ fresh |
-| `SOUL.md` | 2.8KB | 2026-03-05 06:13 | ✅ fresh |
+| `SHARED-FACTS.md` | 5.1KB | 2026-03-06 18:58 | ✅ fresh |
+| `SOUL.md` | 3.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `TOOLS.md` | 1.0KB | 2026-03-01 09:03 | ✅ fresh |
 | `USER.md` | 204B | 2026-03-03 08:00 | ✅ fresh |
 | `memory/2026-03-05-cron-v2-fix.md` | 1.8KB | 2026-03-05 19:53 | ✅ fresh |
-| `timezone.json` | 678B | 2026-03-06 05:47 | ✅ fresh |
+| `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
-## workspace-core (102 files, 0 stale)
+## workspace-core (107 files, 0 stale)
 
 | 文件 | 大小 | 最后修改 | 状态 |
 |------|------|---------|------|
@@ -29,12 +29,12 @@
 | `.learnings/FEATURE_REQUESTS.md` | 75B | 2026-03-03 12:27 | ✅ fresh |
 | `.learnings/LEARNINGS.md` | 105B | 2026-03-03 12:27 | ✅ fresh |
 | `.openclaw/workspace-state.json` | 125B | 2026-02-28 19:30 | ✅ fresh |
-| `AGENTS.md` | 9.8KB | 2026-03-06 05:48 | ✅ fresh |
+| `AGENTS.md` | 10.1KB | 2026-03-07 00:21 | ✅ fresh |
 | `HEARTBEAT.md` | 168B | 2026-02-28 05:13 | ✅ fresh |
 | `IDENTITY.md` | 202B | 2026-02-28 08:56 | ✅ fresh |
-| `MEMORY.md` | 7.8KB | 2026-03-06 10:25 | ✅ fresh |
-| `SHARED-FACTS.md` | 4.8KB | 2026-03-06 10:27 | ✅ fresh |
-| `SOUL.md` | 2.8KB | 2026-03-05 06:13 | ✅ fresh |
+| `MEMORY.md` | 7.9KB | 2026-03-06 18:58 | ✅ fresh |
+| `SHARED-FACTS.md` | 5.1KB | 2026-03-06 18:58 | ✅ fresh |
+| `SOUL.md` | 3.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `TOOLS.md` | 1.0KB | 2026-03-01 09:03 | ✅ fresh |
 | `USER.md` | 874B | 2026-03-03 10:31 | ✅ fresh |
 | `docs/EVO-DEV.md` | 7.2KB | 2026-03-05 17:41 | ✅ fresh |
@@ -55,7 +55,8 @@
 | `memory/2026-03-04.md` | 5.1KB | 2026-03-05 10:31 | ✅ fresh |
 | `memory/2026-03-05-0911.md` | 29.6KB | 2026-03-05 09:11 | ✅ fresh |
 | `memory/2026-03-05.md` | 4.8KB | 2026-03-06 05:48 | ✅ fresh |
-| `memory/2026-03-06.md` | 2.4KB | 2026-03-06 10:08 | ✅ fresh |
+| `memory/2026-03-06.md` | 2.7KB | 2026-03-06 18:58 | ✅ fresh |
+| `memory/2026-03-07.md` | 2.1KB | 2026-03-07 00:33 | ✅ fresh |
 | `playbooks/README.md` | 1.4KB | 2026-03-05 05:12 | ✅ fresh |
 | `playbooks/agent-tax.md` | 3.7KB | 2026-03-03 16:01 | ✅ fresh |
 | `playbooks/cost-and-models.md` | 3.5KB | 2026-03-05 05:08 | ✅ fresh |
@@ -64,13 +65,15 @@
 | `playbooks/multi-agent-core-sync.md` | 1.9KB | 2026-03-05 06:04 | ✅ fresh |
 | `playbooks/new-agent-setup.md` | 4.6KB | 2026-03-05 05:09 | ✅ fresh |
 | `playbooks/nightly-evolution.md` | 10.8KB | 2026-03-05 07:25 | ✅ fresh |
-| `playbooks/rollback-window.md` | 1.3KB | 2026-03-05 05:12 | ✅ fresh |
+| `playbooks/rollback-window.md` | 1.6KB | 2026-03-06 19:00 | ✅ fresh |
 | `playbooks/skill-security-review.md` | 1.2KB | 2026-02-28 13:45 | ✅ fresh |
 | `scripts/agent-core-link.sh` | 1.2KB | 2026-03-05 06:02 | ✅ fresh |
 | `scripts/agent-core-unlink.sh` | 622B | 2026-03-01 09:31 | ✅ fresh |
+| `scripts/config-guard.sh` | 2.3KB | 2026-03-06 19:03 | ✅ fresh |
 | `scripts/rollback-arm.sh` | 901B | 2026-03-01 09:12 | ✅ fresh |
 | `scripts/rollback-disarm.sh` | 591B | 2026-03-01 09:12 | ✅ fresh |
 | `scripts/rollback-status.sh` | 334B | 2026-03-01 09:12 | ✅ fresh |
+| `scripts/update-cron-timezone.sh` | 2.2KB | 2026-03-07 00:21 | ✅ fresh |
 | `scripts/validate-daily-note.sh` | 1.8KB | 2026-03-05 05:23 | ✅ fresh |
 | `scripts/validate-playbooks.sh` | 1.6KB | 2026-03-05 05:23 | ✅ fresh |
 | `scripts/validate-references.sh` | 781B | 2026-03-05 05:59 | ✅ fresh |
@@ -90,6 +93,8 @@
 | `skills/finnhub-pro/SKILL.md` | 3.0KB | 2026-03-03 10:44 | ✅ fresh |
 | `skills/finnhub-pro/_meta.json` | 130B | 2026-03-03 10:44 | ✅ fresh |
 | `skills/finnhub-pro/scripts/finnhub_cli.py` | 14.5KB | 2026-03-03 10:44 | ✅ fresh |
+| `skills/nerve-kanban/SKILL.md` | 3.0KB | 2026-03-06 19:09 | ✅ fresh |
+| `skills/nerve-kanban/references/api.md` | 17.3KB | 2026-03-06 19:09 | ✅ fresh |
 | `skills/self-improving-agent/.clawhub/origin.json` | 153B | 2026-03-03 12:25 | ✅ fresh |
 | `skills/self-improving-agent/.learnings/ERRORS.md` | 75B | 2026-03-03 12:25 | ✅ fresh |
 | `skills/self-improving-agent/.learnings/FEATURE_REQUESTS.md` | 84B | 2026-03-03 12:25 | ✅ fresh |
@@ -124,7 +129,7 @@
 | `templates/playbook.md` | 572B | 2026-03-05 05:22 | ✅ fresh |
 | `templates/shared-fact.md` | 433B | 2026-03-05 05:22 | ✅ fresh |
 | `templates/skill-SKILL.md` | 679B | 2026-03-05 05:22 | ✅ fresh |
-| `timezone.json` | 678B | 2026-03-06 05:47 | ✅ fresh |
+| `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
 ## workspace-evo (8 files, 0 stale)
 
@@ -137,7 +142,7 @@
 | `SOUL.md` | 1.6KB | 2026-03-05 09:01 | ✅ fresh |
 | `TOOLS.md` | 0B | 2026-03-05 09:01 | ✅ fresh |
 | `USER.md` | 0B | 2026-03-05 09:01 | ✅ fresh |
-| `timezone.json` | 678B | 2026-03-06 05:47 | ✅ fresh |
+| `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
 ## workspace-log (40 files, 0 stale)
 
@@ -145,11 +150,11 @@
 |------|------|---------|------|
 | `.gitignore` | 180B | 2026-03-02 20:05 | ✅ fresh |
 | `.openclaw/workspace-state.json` | 74B | 2026-03-02 04:35 | ✅ fresh |
-| `AGENTS.md` | 9.8KB | 2026-03-06 05:48 | ✅ fresh |
-| `HEARTBEAT.md` | 615B | 2026-03-03 21:44 | ✅ fresh |
+| `AGENTS.md` | 10.1KB | 2026-03-07 00:21 | ✅ fresh |
+| `HEARTBEAT.md` | 1016B | 2026-03-07 00:12 | ✅ fresh |
 | `IDENTITY.md` | 542B | 2026-03-06 10:09 | ✅ fresh |
-| `SHARED-FACTS.md` | 4.8KB | 2026-03-06 10:27 | ✅ fresh |
-| `SOUL.md` | 2.8KB | 2026-03-05 06:13 | ✅ fresh |
+| `SHARED-FACTS.md` | 5.1KB | 2026-03-06 18:58 | ✅ fresh |
+| `SOUL.md` | 3.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `TOOLS.md` | 1.0KB | 2026-03-01 09:03 | ✅ fresh |
 | `USER.md` | 2.6KB | 2026-03-03 03:41 | ✅ fresh |
 | `aliases.json` | 2B | 2026-03-03 11:00 | ✅ fresh |
@@ -176,13 +181,13 @@
 | `skills/health/SKILL.md` | 2.4KB | 2026-03-03 07:01 | ✅ fresh |
 | `skills/health/sleep-shortcut-steps.md` | 2.0KB | 2026-03-02 09:21 | ✅ fresh |
 | `skills/journal/SKILL.md` | 20.0KB | 2026-03-06 10:17 | ✅ fresh |
-| `skills/location/SKILL.md` | 10.4KB | 2026-03-06 05:48 | ✅ fresh |
+| `skills/location/SKILL.md` | 11.2KB | 2026-03-07 00:21 | ✅ fresh |
 | `skills/location/known-places.json` | 1.5KB | 2026-03-06 05:38 | ✅ fresh |
 | `skills/vault/SKILL.md` | 3.7KB | 2026-03-06 10:18 | ✅ fresh |
 | `skills/workflowy/.clawhub/origin.json` | 141B | 2026-03-02 06:26 | ✅ fresh |
 | `skills/workflowy/SKILL.md` | 6.8KB | 2026-03-02 11:40 | ✅ fresh |
 | `skills/workflowy/_meta.json` | 128B | 2026-03-02 06:26 | ✅ fresh |
-| `timezone.json` | 678B | 2026-03-06 05:47 | ✅ fresh |
+| `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
 ## workspace-tax (27 files, 0 stale)
 
@@ -199,11 +204,11 @@
 | `2025/05-exports/day1-1040-instruction-notes.md` | 4.3KB | 2026-03-03 16:01 | ✅ fresh |
 | `2025/05-exports/day2-income-capital-notes.md` | 11.1KB | 2026-03-04 16:02 | ✅ fresh |
 | `2025/05-exports/day3-deduction-credit-notes.md` | 7.9KB | 2026-03-05 16:02 | ✅ fresh |
-| `AGENTS.md` | 9.8KB | 2026-03-06 05:48 | ✅ fresh |
+| `AGENTS.md` | 10.1KB | 2026-03-07 00:21 | ✅ fresh |
 | `HEARTBEAT.md` | 168B | 2026-02-28 15:20 | ✅ fresh |
 | `IDENTITY.md` | 230B | 2026-02-28 16:11 | ✅ fresh |
-| `SHARED-FACTS.md` | 4.8KB | 2026-03-06 10:27 | ✅ fresh |
-| `SOUL.md` | 2.8KB | 2026-03-05 06:13 | ✅ fresh |
+| `SHARED-FACTS.md` | 5.1KB | 2026-03-06 18:58 | ✅ fresh |
+| `SOUL.md` | 3.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `TOOLS.md` | 1.0KB | 2026-03-01 09:03 | ✅ fresh |
 | `USER.md` | 495B | 2026-02-28 22:58 | ✅ fresh |
 | `data/tax-professional/2025-expenses.json` | 1.9KB | 2026-02-28 23:39 | ✅ fresh |
@@ -214,13 +219,13 @@
 | `memory/2026-03-03.md` | 929B | 2026-03-05 10:31 | ✅ fresh |
 | `memory/2026-03-04.md` | 2.9KB | 2026-03-05 10:31 | ✅ fresh |
 | `memory/2026-03-05.md` | 2.8KB | 2026-03-05 16:02 | ✅ fresh |
-| `timezone.json` | 678B | 2026-03-06 05:47 | ✅ fresh |
+| `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
 ## 汇总
 
 | 指标 | 数值 |
 |------|------|
 | Workspaces | 5 |
-| 总文件数 | 188 |
+| 总文件数 | 193 |
 | Stale (>7天) | 0 |
-| Fresh | 188 |
+| Fresh | 193 |
