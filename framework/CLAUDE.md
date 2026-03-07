@@ -6,8 +6,10 @@ You are executing a task inside an Evolution Loop instance.
 
 Tasks have a `runner` field that determines execution environment:
 
-- **`agent`** (default) — Runs via `openclaw agent`. Full tools: web_search, web_fetch, memory, plugins, Bash, Read/Write/Edit. Use for research, fetching URLs, anything needing internet.
-- **`claude`** — Runs via `claude -p`. Local tools only: Bash, Read/Write/Edit. Faster, no session overhead. Use for code generation, writing docs from existing context, gates.
+- **`agent`** (default) — Runs via `openclaw agent`. Full tools: web_search, web_fetch, memory, plugins, Bash, Read/Write/Edit. Uses API tokens. Best for research, fetching URLs, anything needing internet or OpenClaw plugins.
+- **`claude`** — Runs via `claude -p`. Local tools only: Bash, Read/Write/Edit. Uses Claude subscription. Faster, no session overhead. Good for code generation, writing docs from existing context, gates.
+- **`codex`** — Runs via `codex exec`. Local tools + optional web search. Uses OpenAI/Codex subscription. Good for code generation, refactoring, code review. Full-auto mode with full disk access.
+- **`gemini`** — Runs via `gemini -p`. Local tools. Uses Gemini subscription. Good for code generation, analysis, writing. Runs in sandbox with yolo (auto-approve) mode.
 
 ## Available Tools (agent mode)
 
