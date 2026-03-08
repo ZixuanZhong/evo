@@ -56,9 +56,12 @@ d = json.load(open(p))
 for t in d['tasks']:
     if t['id'] == '$task_id' and t['status'] == 'in_progress':
         if $exit_code == 0:
-            # Check if output files exist
+            # Check if output files exist (support both output_files array and legacy output_file string)
+            out_files = t.get('output_files', [])
+            if not out_files and t.get('output_file'):
+                out_files = [t['output_file']]
             all_exist = True
-            for of in t.get('output_files', []):
+            for of in out_files:
                 if of and not os.path.exists(os.path.join('$INSTANCE_DIR', of)):
                     all_exist = False
                     break
@@ -200,7 +203,14 @@ for t in d['tasks']:
   task_type=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('type','task'))" 2>/dev/null)
   task_phase=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('phase',''))" 2>/dev/null)
   spec_file=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('spec_file','') or '')" 2>/dev/null)
-  output_files=$(echo "$task_json" | python3 -c "import json,sys; print(', '.join(json.load(sys.stdin).get('output_files',[])))" 2>/dev/null)
+  output_files=$(echo "$task_json" | python3 -c "
+import json,sys
+t=json.load(sys.stdin)
+ofs=t.get('output_files', [])
+if not ofs and t.get('output_file'):
+    ofs=[t['output_file']]
+print(', '.join(ofs))
+" 2>/dev/null)
   task_runner=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('runner','agent'))" 2>/dev/null)
 
   log "Executing task $task_id: $task_title"
@@ -250,7 +260,10 @@ dep_map = {t2['id']: t2 for t2 in tasks}
 for dep_id in deps:
     dep = dep_map.get(dep_id)
     if dep and dep.get('status') == 'done':
-        for of in dep.get('output_files', []):
+        dep_ofs = dep.get('output_files', [])
+        if not dep_ofs and dep.get('output_file'):
+            dep_ofs = [dep['output_file']]
+        for of in dep_ofs:
             fp = os.path.join('$INSTANCE_DIR', of)
             if os.path.isfile(fp) and os.path.getsize(fp) < 30000:
                 print(fp)
@@ -296,11 +309,11 @@ $task_desc
 1. Create the output file(s) listed above. All paths relative to: $INSTANCE_DIR
 2. After completing the work, mark the task as done:
    \`\`\`bash
-   bash $SCRIPT_DIR/mark-task.sh $INSTANCE_DIR $task_id done
+   bash $SCRIPTS_DIR/mark-task.sh $INSTANCE_DIR $task_id done
    \`\`\`
 3. If you cannot complete the task, mark it as failed:
    \`\`\`bash
-   bash $SCRIPT_DIR/mark-task.sh $INSTANCE_DIR $task_id failed \"reason here\"
+   bash $SCRIPTS_DIR/mark-task.sh $INSTANCE_DIR $task_id failed \"reason here\"
    \`\`\`
 4. ⛔ **DO NOT edit tasks.json directly.** Only use mark-task.sh. Any direct edits will be reverted.
 5. For research tasks: USE web_search to find real papers, products, benchmarks. Do NOT fabricate citations.
