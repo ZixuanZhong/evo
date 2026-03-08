@@ -69,3 +69,4 @@
 {"ts": "2026-03-08T01:38:30.600978+00:00", "task_id": "4.G", "event": "started", "title": "Gate: 生成摘要 + 发 Discord", "phase": 4, "status": "in_progress", "attempts": 1, "plan_version": 1, "model": "opus"}
 {"ts": "2026-03-08T01:39:09.258934+00:00", "task_id": "4.G", "event": "completed", "title": "Gate: 生成摘要 + 发 Discord", "phase": 4, "status": "done", "attempts": 2, "plan_version": 1, "exit_code": 0}
 {"ts": "2026-03-08T01:40:52.155559+00:00", "task_id": "worker", "event": "auto_stop", "plan_version": 1, "reason": "all_tasks_complete"}
+{"ts": "2026-03-08T02:58:57.488790+00:00", "task_id": "0.1", "event": "started", "title": "扫描 workspace 状态", "phase": 0, "status": "in_progress", "attempts": 1, "plan_version": 1, "model": "opus"}

@@ -1,7 +1,7 @@
 {
   "project_name": "nightly-evolution",
   "plan_version": 1,
-  "phase": "complete",
+  "phase": "recurring",
   "planned_at": null,
   "planned_by": "main",
   "planner_trigger": false,
@@ -13,11 +13,10 @@
       "description": "扫描所有 agent workspace 文件：列出每个文件的大小和最后修改时间。标记超过 7 天未修改的为 stale。输出 workspace-scan.md，包含文件清单和 staleness 标记。",
       "depends_on": [],
       "output_file": "output/workspace-scan.md",
-      "status": "done",
-      "attempts": 2,
+      "status": "in_progress",
+      "attempts": 1,
       "runner": "agent",
-      "started_at": "2026-03-08T01:30:05.405583+00:00",
-      "completed_at": "2026-03-08T01:30:26.464772+00:00"
+      "started_at": "2026-03-08T02:58:57.291454+00:00"
     },
     {
       "id": "1.1",
@@ -28,11 +27,9 @@
         "0.1"
       ],
       "output_file": "output/review-core.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:30:42.023135+00:00",
-      "completed_at": "2026-03-08T01:31:03.394920+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "1.2",
@@ -43,10 +40,9 @@
         "0.1"
       ],
       "output_file": "output/review-playbooks.md",
-      "status": "done",
-      "attempts": 1,
-      "runner": "agent",
-      "completed_at": "2026-03-08T01:31:03.394920+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "1.3",
@@ -55,10 +51,9 @@
       "description": "检查 workspace-{tax,log,alpha,evo}/ 中的 symlink 是否正确指向 workspace-core。验证文件列表：AGENTS.md, SOUL.md, TOOLS.md, SHARED-FACTS.md, playbooks/, timezone.json。修复断裂 symlink。输出 review-symlinks.md。",
       "depends_on": [],
       "output_file": "output/review-symlinks.md",
-      "status": "done",
-      "attempts": 1,
-      "runner": "agent",
-      "completed_at": "2026-03-08T01:31:03.394920+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "1.4",
@@ -67,11 +62,9 @@
       "description": "运行 scripts/validate-daily-note.sh memory/（如果存在）。检查所有 cron job 的 consecutiveErrors 和 lastRunStatus。输出 review-health.md，列出异常项。",
       "depends_on": [],
       "output_file": "output/review-health.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:31:17.128386+00:00",
-      "completed_at": "2026-03-08T01:31:52.741907+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "2.1",
@@ -82,11 +75,9 @@
         "1.1"
       ],
       "output_file": "output/distill-memory.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:32:09.358466+00:00",
-      "completed_at": "2026-03-08T01:33:58.186715+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "2.2",
@@ -97,50 +88,42 @@
         "2.1"
       ],
       "output_file": "output/sync-shared-facts.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:34:13.135033+00:00",
-      "completed_at": "2026-03-08T01:34:51.164023+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "3.1",
       "phase": 3,
       "title": "OpenClaw 生态扫描",
-      "description": "用 web_search 搜索最近 24 小时的 OpenClaw 相关新闻：新 skill 发布、安全告警、版本更新、社区动态。检查当前版本是否最新。输出 community-openclaw.md。",
+      "description": "用 web_search 搜索 OpenClaw 生态最新动态（过去 24-48h）。\n\n搜索关键词（至少搜 3 组）：\n- \"openclaw\" new skill / update / release\n- \"openclaw\" site:github.com\n- \"openclaw\" site:reddit.com OR site:news.ycombinator.com\n\n输出到 community-openclaw.md，格式：\n# OpenClaw 生态 {date}\n\n## 发现 (每条必须 2-3 句话描述)\n- **[标题/名称]** — 是什么 + 为什么值得关注 + 链接\n- ...\n\n如果没有有价值的发现，写明 \"过去 24h 无重要更新\"，但仍然列出搜索了哪些关键词。",
       "depends_on": [],
       "output_file": "output/community-openclaw.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:35:07.214480+00:00",
-      "completed_at": "2026-03-08T01:35:39.509757+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "3.2",
       "phase": 3,
       "title": "AI/LLM 工具链新闻",
-      "description": "用 web_search 搜索最近 24 小时的 AI agent、LLM 工具链、coding agent 相关新闻和发布。关注：新模型发布、框架更新、安全事件、有趣项目。输出 community-ai.md。",
+      "description": "用 web_search 搜索 AI/LLM 工具链最新动态（过去 24-48h）。\n\n搜索关键词（至少搜 3 组）：\n- AI agent framework / tool / update 2026\n- LLM coding assistant / code generation\n- Claude / GPT / Gemini new feature\n\n输出到 community-ai.md，格式：\n# AI/LLM 工具链 {date}\n\n## 发现 (每条必须 2-3 句话描述)\n- **[标题/名称]** — 是什么 + 影响/意义 + 链接\n- ...\n\n如果没有有价值的发现，写明搜索范围和结论。",
       "depends_on": [],
       "output_file": "output/community-ai.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:35:56.131281+00:00",
-      "completed_at": "2026-03-08T01:36:36.108014+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "3.3",
       "phase": 3,
       "title": "垂直领域调研",
-      "description": "用 web_search 搜索：(1) 量化交易/trading AI 最新动态 (2) personal infrastructure/self-hosting 新闻 (3) 其他 niche 但相关的话题。输出 community-vertical.md。",
+      "description": "用 web_search 搜索与 Caton 相关的垂直领域最新动态（过去 24-48h）。\n\n搜索领域（至少覆盖 2 个）：\n- 量化交易 / algorithmic trading / alpha strategy\n- 个人基础设施 / self-hosted / homelab\n- 税务优化 / tax planning tech\n\n输出到 community-vertical.md，格式：\n# 垂直领域调研 {date}\n\n## 发现 (每条必须 2-3 句话描述)\n- **[标题/名称]** — 是什么 + 与 Caton 的关联 + 链接\n- ...\n\n如果没有有价值的发现，写明搜索范围和结论。",
       "depends_on": [],
       "output_file": "output/community-vertical.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:36:50.769078+00:00",
-      "completed_at": "2026-03-08T01:37:26.845449+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "4.1",
@@ -151,17 +134,15 @@
         "2.2"
       ],
       "output_file": "output/git-push.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:37:42.709297+00:00",
-      "completed_at": "2026-03-08T01:38:16.761423+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     },
     {
       "id": "4.G",
       "phase": 4,
       "title": "Gate: 生成摘要 + 发 Discord",
-      "description": "读取所有 output/*.md 文件。生成一份简洁的 nightly evolution 摘要。用 message tool 发送 Components V2 卡片到 Discord #main (target=1477311294368645365)：\n- container accentColor=#2ecc71\n- blocks 只用 type='text' 和 type='separator'\n- 包含：workspace 变更摘要、memory 蒸馏摘要、社区调研亮点、git 状态\n- 末尾 @mention <@803422039977099284> + 标注模型\n- 发完后输出 summary.md\n\n这是 Gate task：所有前置任务必须完成。",
+      "description": "读取所有 output/*.md 文件。生成一份**详细的** nightly evolution 报告。\n\n用 message tool 发送 Components V2 卡片到 Discord #main (target=1477311294368645365)：\n- container accentColor=#2ecc71（有问题用 #e67e22）\n- blocks 只用 type='text' 和 type='separator'\n- 每个 section 用一个 text block，用 separator 分隔\n\n卡片内容必须包含以下所有部分：\n\n### 1. 📁 Workspace 变更\n- 列出每个被修改/创建/删除的文件，说明做了什么改动\n- 例：`MEMORY.md` — 更新 Active Context 增加 3 条记录；`SHARED-FACTS.md` — 新增 timezone 相关 fact\n\n### 2. 🧠 Memory 蒸馏\n- 从哪些 daily notes 提取了什么内容\n- MEMORY.md 的哪些 section 被更新了，具体改了什么\n- SHARED-FACTS.md 新增/修改了哪些 fact\n\n### 3. 🔍 社区调研（每条都要有 1-2 句话说明是什么、为什么值得关注）\n- **OpenClaw 生态**: 列出每个发现（新 skill/版本/讨论），每条 1-2 句话描述\n- **AI/LLM 工具链**: 列出每个发现，每条 1-2 句话\n- **垂直领域**: 列出每个发现，每条 1-2 句话\n- ❌ 不要只放 keyword！要让 Caton 不用打开详细文件就能了解每条内容\n\n### 4. 🔧 健康检查\n- Cron 状态汇总（几个正常、几个异常）\n- Symlink 检查结果\n- 脚本验证结果\n\n### 5. 📦 Git\n- commit hash + 变更文件数 + push 状态\n\n末尾: <@803422039977099284> 模型：{model}\n\n发完后输出 summary.md（内容与卡片一致）。\n\n这是 Gate task：所有前置任务必须完成。",
       "depends_on": [
         "4.1",
         "3.1",
@@ -169,18 +150,16 @@
         "3.3"
       ],
       "output_file": "output/summary.md",
-      "status": "done",
-      "attempts": 2,
-      "runner": "agent",
-      "started_at": "2026-03-08T01:38:30.401027+00:00",
-      "completed_at": "2026-03-08T01:39:03.942811+00:00"
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
     }
   ],
   "summary": {
     "total": 12,
-    "pending": 0,
-    "in_progress": 0,
-    "done": 12,
+    "pending": 11,
+    "in_progress": 1,
+    "done": 0,
     "failed": 0,
     "escalated": 0
   }
