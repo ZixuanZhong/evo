@@ -163,6 +163,36 @@ evo reset nightly-evolution
 evo reset nightly-evolution --force
 ```
 
+### Example 3: Batch Processing (auto_split)
+
+See [examples/batch-processing/](examples/batch-processing/) — demonstrates `auto_split` for runtime task expansion. Task 0.1 scans files and produces a list; task 1.1 auto-splits into sub-tasks based on the list size.
+
+```bash
+cp -r examples/batch-processing ~/.openclaw/evo/instances/my-batch
+# Edit SPEC.md to match your use case
+evo start my-batch
+```
+
+**Key task in tasks.json:**
+
+```json
+{
+  "id": "1.1",
+  "title": "处理所有文件",
+  "auto_split": {
+    "items_file": "output/file-list.txt",
+    "batch_size": 5,
+    "output_prefix": "output/processed"
+  }
+}
+```
+
+If `file-list.txt` has 12 items with `batch_size: 5`, the worker automatically creates:
+- `1.1.1` — items 1-5 → `output/processed.1.md`
+- `1.1.2` — items 6-10 → `output/processed.2.md`
+- `1.1.3` — items 11-12 → `output/processed.3.md`
+- `1.1` becomes a gate waiting for all sub-tasks
+
 ## CLI Reference
 
 | Command | Description |
@@ -230,6 +260,7 @@ Each task has a `runner` field:
 │   │   ├── worker-loop.sh        # Main execution loop
 │   │   ├── planner.sh            # AI planner
 │   │   ├── pick_next_task.py     # Task selection + anti-stuck
+│   │   ├── expand_task.py        # Auto-split task expansion
 │   │   ├── check_budget.py       # Daily budget enforcement
 │   │   ├── log_task.py           # Structured JSONL logging
 │   │   ├── reporter.sh           # Status reporting
@@ -250,9 +281,65 @@ Each task has a `runner` field:
 │       ├── output/
 │       └── logs/
 └── examples/
-    ├── research-project/
-    └── nightly-evolution/
+    ├── research-project/         # One-shot research
+    ├── nightly-evolution/        # Recurring nightly tasks
+    └── batch-processing/         # Auto-split demo
 ```
+
+## Auto-Split: Dynamic Task Expansion
+
+When a task's workload depends on a previous task's output (e.g., "process N documents" where N is unknown at plan time), use `auto_split` to automatically split it into sub-tasks at runtime.
+
+### How It Works
+
+```
+Task 0.1 produces file-list.txt (N items)
+    ↓
+Task 1.1 has auto_split → worker reads file-list.txt
+    ↓ N > batch_size?
+    ├── Yes → split into 1.1.1, 1.1.2, ... sub-tasks
+    │         1.1 becomes a gate depending on all sub-tasks
+    └── No  → execute 1.1 normally (no split)
+    ↓
+Task 2.1 depends on 1.1 (gate) → runs after all sub-tasks complete
+```
+
+### Task Schema
+
+Add `auto_split` to any task in `tasks.json`:
+
+```json
+{
+  "id": "1.1",
+  "title": "Process all documents",
+  "depends_on": ["0.1"],
+  "auto_split": {
+    "items_file": "output/file-list.txt",
+    "batch_size": 5,
+    "output_prefix": "output/processed"
+  },
+  "output_files": ["output/processed.md"]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `items_file` | Path to a newline-delimited file (one item per line), produced by upstream task |
+| `batch_size` | Max items per sub-task (tune to stay within `worker_timeout`) |
+| `output_prefix` | Output file prefix; sub-tasks produce `{prefix}.1.md`, `{prefix}.2.md`, ... |
+
+### Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| `items_file` not found | Task marked `failed` |
+| 0 items | Gate marked `done` immediately |
+| N ≤ batch_size | No split, task executes normally |
+| Sub-task fails | L0/L0.5/L0.75 handle retries; gate won't pass until all sub-tasks done |
+
+### Example
+
+See [examples/batch-processing/](examples/batch-processing/) — a project that scans files, auto-splits processing into batches, then summarizes results.
 
 ## Anti-Stuck Mechanisms
 

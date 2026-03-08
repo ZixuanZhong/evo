@@ -19,7 +19,8 @@ SPEC.md → 规划器 → tasks.json → Worker 循环 → 输出文件
 ## 特性
 
 - 🔄 **分阶段执行** — 任务按阶段组织，Gate 控制推进
-- 🔀 **双 Runner** — `agent`（完整工具：网搜、插件）或 `claude`（纯本地，快）
+- 🔀 **多 Runner** — `agent`（完整工具）、`claude` / `codex` / `gemini`（本地 CLI，用订阅）
+- 🧩 **自动拆分** — `auto_split` 运行时按上游产出动态拆分子任务，避免超时
 - 🛡️ **防卡死机制** — L0 超时重置、L0.5 死锁破解、L0.75 自动升级
 - 📊 **预算控制** — 每日任务限额，防止失控
 - 🔔 **Discord 通知** — Gate 通过、完成、熔断（可选）
@@ -192,6 +193,47 @@ P3: 社区调研 × 3
 P4: Git 推送 + 总结报告
 ```
 
+### 示例 3：批量处理（auto_split）
+
+见 [examples/batch-processing/](examples/batch-processing/) — 展示 `auto_split` 运行时动态拆分。任务 0.1 扫描文件列表，任务 1.1 根据列表大小自动拆分子任务。
+
+```bash
+cp -r examples/batch-processing ~/.openclaw/evo/instances/my-batch
+# 编辑 SPEC.md 适配你的场景
+evo start my-batch
+```
+
+**tasks.json 关键任务：**
+
+```json
+{
+  "id": "1.1",
+  "title": "处理所有文件",
+  "auto_split": {
+    "items_file": "output/file-list.txt",
+    "batch_size": 5,
+    "output_prefix": "output/processed"
+  }
+}
+```
+
+如果 `file-list.txt` 有 12 条，`batch_size: 5`，worker 自动创建：
+- `1.1.1` — 第 1-5 条 → `output/processed.1.md`
+- `1.1.2` — 第 6-10 条 → `output/processed.2.md`
+- `1.1.3` — 第 11-12 条 → `output/processed.3.md`
+- `1.1` 变成 gate，等待所有子任务完成
+
+## Runner 选择
+
+每个任务有 `runner` 字段：
+
+- **`agent`** — `openclaw agent`，完整工具（网搜、插件）。消耗 API token。适合需要联网的调研任务。
+- **`claude`** — `claude -p`，纯本地工具。使用 Claude 订阅。快、省。适合代码生成、文档编写。
+- **`codex`** — `codex exec`，本地工具 + 可选网搜。使用 OpenAI 订阅。全自动模式。适合代码生成、重构。
+- **`gemini`** — `gemini -p`，沙盒本地工具。使用 Gemini 订阅。Yolo 模式。适合分析、写作。
+
+> **省钱建议**：不需要网搜或 OpenClaw 插件时，优先用 `claude`/`codex`/`gemini`（订阅制）。
+
 ## CLI 参考
 
 | 命令 | 说明 |
@@ -232,6 +274,60 @@ P4: Git 推送 + 总结报告
 | `budget_daily` | `50` | 每日最大任务数 |
 | `recurring` | `false` | 是否支持从模板 `evo reset` |
 
+## 自动拆分（auto_split）
+
+当任务的工作量取决于上游任务的输出（比如「处理 N 个文档」，N 在规划时未知），使用 `auto_split` 在运行时自动拆分子任务。
+
+### 工作流程
+
+```
+任务 0.1 产出 file-list.txt（N 条）
+    ↓
+任务 1.1 带 auto_split → worker 读 file-list.txt
+    ↓ N > batch_size?
+    ├── 是 → 拆成 1.1.1, 1.1.2, ... 子任务
+    │        1.1 变成 gate，依赖所有子任务
+    └── 否 → 正常执行 1.1（不拆）
+    ↓
+任务 2.1 依赖 1.1（gate）→ 所有子任务完成后执行
+```
+
+### 配置方式
+
+在 `tasks.json` 的任务上添加 `auto_split` 字段：
+
+```json
+{
+  "id": "1.1",
+  "title": "处理所有文档",
+  "depends_on": ["0.1"],
+  "auto_split": {
+    "items_file": "output/file-list.txt",
+    "batch_size": 5,
+    "output_prefix": "output/processed"
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `items_file` | 待处理项清单（一行一条），由上游任务产出 |
+| `batch_size` | 每个子任务处理的条目数（调整以不超时） |
+| `output_prefix` | 子任务输出文件前缀：`{prefix}.1.md`, `{prefix}.2.md`, ... |
+
+### 边界情况
+
+| 场景 | 行为 |
+|------|------|
+| `items_file` 不存在 | 任务标记 `failed` |
+| 0 条 | Gate 直接标记 `done` |
+| N ≤ batch_size | 不拆，正常执行 |
+| 子任务失败 | L0/L0.5/L0.75 正常处理重试 |
+
+### 示例
+
+见 [examples/batch-processing/](examples/batch-processing/) — 扫描文件 → 自动拆分批处理 → 汇总结果。
+
 ## 防卡死机制
 
 | 层级 | 触发条件 | 动作 |
@@ -253,8 +349,11 @@ P4: Git 推送 + 总结报告
 │   ├── .env.example              # 配置模板
 │   ├── scripts/                  # 核心脚本
 │   └── templates/                # 实例模板
-├── instances/                    # 运行实例
+├── instances/                    # 运行实例（gitignore）
 └── examples/                     # 示例项目
+    ├── research-project/         # 一次性调研
+    ├── nightly-evolution/        # 循环夜间任务
+    └── batch-processing/         # auto_split 示例
 ```
 
 ## 许可证
