@@ -27,6 +27,7 @@ TASKS_FILE="$INSTANCE_DIR/tasks.json"
 
 python3 -c "
 import json, tempfile, os, sys
+from datetime import datetime, timezone
 
 p = '$TASKS_FILE'
 task_id = '$TASK_ID'
@@ -38,10 +39,11 @@ found = False
 for t in d['tasks']:
     if t['id'] == task_id:
         t['status'] = status
-        if status == 'failed' and error_msg:
-            t['error'] = error_msg
-        elif status == 'done':
+        if status == 'done':
+            t['completed_at'] = datetime.now(timezone.utc).isoformat()
             t.pop('error', None)
+        elif status == 'failed' and error_msg:
+            t['error'] = error_msg
         found = True
         break
 
