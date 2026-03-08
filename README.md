@@ -19,7 +19,8 @@ SPEC.md → Planner → tasks.json → Worker Loop → Output Files
 ## Features
 
 - 🔄 **Phased execution** — tasks organized by phase, gates control progression
-- 🔀 **Multi-runner** — `agent` (full tools, API tokens), `claude` / `codex` / `gemini` (coding CLIs, subscription plans)
+- 🔀 **Multiple runner types** — `agent` (full tools, API tokens), `claude` / `codex` / `gemini` (coding CLIs, subscription plans)
+- ⚡ **Parallel workers** — run multiple worker loops concurrently to speed up independent tasks
 - 🛡️ **Anti-stuck mechanisms** — L0 stale reset, L0.5 deadlock breaker, L0.75 auto-escalation
 - 📊 **Budget control** — daily task limits prevent runaway costs
 - 🔔 **Discord notifications** — gate passes, completions, circuit breakers (optional)
@@ -163,16 +164,46 @@ evo reset nightly-evolution
 evo reset nightly-evolution --force
 ```
 
+### Example 3: Batch Processing (auto_split)
+
+See [examples/batch-processing/](examples/batch-processing/) — demonstrates `auto_split` for runtime task expansion. Task 0.1 scans files and produces a list; task 1.1 auto-splits into sub-tasks based on the list size.
+
+```bash
+cp -r examples/batch-processing ~/.openclaw/evo/instances/my-batch
+# Edit SPEC.md to match your use case
+evo start my-batch
+```
+
+**Key task in tasks.json:**
+
+```json
+{
+  "id": "1.1",
+  "title": "处理所有文件",
+  "auto_split": {
+    "items_file": "output/file-list.txt",
+    "batch_size": 5,
+    "output_prefix": "output/processed"
+  }
+}
+```
+
+If `file-list.txt` has 12 items with `batch_size: 5`, the worker automatically creates:
+- `1.1.1` — items 1-5 → `output/processed.1.md`
+- `1.1.2` — items 6-10 → `output/processed.2.md`
+- `1.1.3` — items 11-12 → `output/processed.3.md`
+- `1.1` becomes a gate waiting for all sub-tasks
+
 ## CLI Reference
 
 | Command | Description |
 |---------|-------------|
 | `evo create <name> "<desc>"` | Create new instance with scaffolding |
-| `evo start <name>` | Start the worker loop (background) |
-| `evo stop <name>` | Stop the worker loop |
+| `evo start <name> [-w N]` | Start worker loop(s) (N=parallel workers) |
+| `evo stop <name>` | Stop all worker loops |
 | `evo status [name]` | Show status (all instances or one) |
 | `evo status --json` | Machine-readable status output |
-| `evo logs <name> [--follow]` | View worker logs |
+| `evo logs <name> [--follow] [--worker ID]` | View worker logs |
 | `evo plan <name>` | Run the AI planner |
 | `evo reset <name> [--force]` | Reset tasks to pending |
 | `evo integrate <name>` | Show output routing suggestions |
@@ -202,6 +233,7 @@ Set these in `~/.openclaw/evo/.env` (auto-loaded by CLI).
 | `planner_model` | `opus` | Model for planner |
 | `worker_agent` | `evo` | OpenClaw agent ID for `agent` runner |
 | `worker_timeout` | `600` | Timeout per task (seconds) |
+| `workers` | `1` | Number of parallel worker loops |
 | `budget_daily` | `50` | Max tasks per day |
 | `recurring` | `false` | Whether instance supports `evo reset` from template |
 
@@ -230,6 +262,7 @@ Each task has a `runner` field:
 │   │   ├── worker-loop.sh        # Main execution loop
 │   │   ├── planner.sh            # AI planner
 │   │   ├── pick_next_task.py     # Task selection + anti-stuck
+│   │   ├── expand_task.py        # Auto-split task expansion
 │   │   ├── check_budget.py       # Daily budget enforcement
 │   │   ├── log_task.py           # Structured JSONL logging
 │   │   ├── reporter.sh           # Status reporting
@@ -250,9 +283,106 @@ Each task has a `runner` field:
 │       ├── output/
 │       └── logs/
 └── examples/
-    ├── research-project/
-    └── nightly-evolution/
+    ├── research-project/         # One-shot research
+    ├── nightly-evolution/        # Recurring nightly tasks
+    └── batch-processing/         # Auto-split demo
 ```
+
+## Parallel Workers
+
+By default, each instance runs a single worker loop. For instances with many independent tasks, you can run multiple workers in parallel:
+
+```bash
+# Start with 3 parallel workers
+evo start my-research --workers 3
+
+# Or set default in state.json
+# "workers": 3
+```
+
+Each worker independently picks tasks from the queue (`pick_next_task.py` uses file locking for safe concurrent access). Workers are fully crash-isolated — if one hangs or fails, others keep running.
+
+```bash
+# View status — shows all workers
+evo status my-research
+# Worker 1: running (PID 12345)
+# Worker 2: running (PID 12346)
+# Worker 3: running (PID 12347)
+
+# View logs per worker
+evo logs my-research --worker 2
+
+# Follow all worker logs
+evo logs my-research --follow
+
+# Stop all workers
+evo stop my-research
+```
+
+### When to Use
+
+| Workers | Best for |
+|---------|----------|
+| 1 (default) | Sequential workflows, low-cost, simple |
+| 2-3 | Instances with many independent tasks in the same phase |
+| 4+ | Large batch processing with `auto_split` |
+
+> **Note**: More workers doesn't help if tasks are strictly sequential (each depends on the previous). The speedup comes from independent tasks that can run in parallel.
+
+## Auto-Split: Dynamic Task Expansion
+
+When a task's workload depends on a previous task's output (e.g., "process N documents" where N is unknown at plan time), use `auto_split` to automatically split it into sub-tasks at runtime.
+
+### How It Works
+
+```
+Task 0.1 produces file-list.txt (N items)
+    ↓
+Task 1.1 has auto_split → worker reads file-list.txt
+    ↓ N > batch_size?
+    ├── Yes → split into 1.1.1, 1.1.2, ... sub-tasks
+    │         1.1 becomes a gate depending on all sub-tasks
+    └── No  → execute 1.1 normally (no split)
+    ↓
+Task 2.1 depends on 1.1 (gate) → runs after all sub-tasks complete
+```
+
+### Task Schema
+
+Add `auto_split` to any task in `tasks.json`:
+
+```json
+{
+  "id": "1.1",
+  "title": "Process all documents",
+  "depends_on": ["0.1"],
+  "auto_split": {
+    "items_file": "output/file-list.txt",
+    "batch_size": 5,
+    "output_prefix": "output/processed"
+  },
+  "output_files": ["output/processed.md"]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `items_file` | Path to a newline-delimited file (one item per line), produced by upstream task |
+| `batch_size` | Max items per sub-task (tune to stay within `worker_timeout`) |
+| `output_prefix` | Output file prefix; sub-tasks produce `{prefix}.1.md`, `{prefix}.2.md`, ... |
+
+### Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| `items_file` not found | Task marked `failed` |
+| 0 items | Gate marked `done` immediately |
+| N ≤ batch_size | No split, task executes normally |
+| Sub-task fails | L0/L0.5/L0.75 handle retries; gate won't pass until all sub-tasks done |
+
+### Example
+
+See [examples/batch-processing/](examples/batch-processing/) — a project that scans files, auto-splits processing into batches, then summarizes results.
 
 ## Anti-Stuck Mechanisms
 

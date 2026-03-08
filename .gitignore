@@ -9,3 +9,5 @@ instances/
 
 # macOS
 .DS_Store
+.claude/
+MERGE.md

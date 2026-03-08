@@ -5,11 +5,12 @@ set -uo pipefail
 EVO_ROOT="${EVO_ROOT:-$HOME/.openclaw/evo}"
 SCRIPTS_DIR="$EVO_ROOT/framework/scripts"
 INSTANCE_NAME="$1"
+WORKER_ID="${2:-1}"
 INSTANCE_DIR="$EVO_ROOT/instances/$INSTANCE_NAME"
 TASKS_FILE="$INSTANCE_DIR/tasks.json"
 STATE_FILE="$INSTANCE_DIR/state.json"
 SPEC_FILE="$INSTANCE_DIR/SPEC.md"
-LOG_FILE="$INSTANCE_DIR/logs/worker.log"
+LOG_FILE="$INSTANCE_DIR/logs/worker.${WORKER_ID}.log"
 CLAUDE_MD="$EVO_ROOT/framework/CLAUDE.md"
 
 SLEEP_INTERVAL=10
@@ -20,7 +21,7 @@ consecutive_failures=0
 MAX_LOG_SIZE=10485760  # 10MB
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')][W${WORKER_ID}] $*"
 }
 
 check_budget() {
@@ -220,6 +221,32 @@ print(', '.join(ofs))
   task_runner=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('runner','agent'))" 2>/dev/null)
 
   log "Executing task $task_id: $task_title"
+
+  # ─── Auto-split check ───
+  has_split=$(echo "$task_json" | python3 -c "
+import json,sys
+t=json.load(sys.stdin)
+print('yes' if t.get('auto_split') else 'no')
+" 2>/dev/null || echo "no")
+
+  if [[ "$has_split" == "yes" ]]; then
+    log "Task $task_id has auto_split, expanding..."
+    expand_exit=0
+    python3 "$SCRIPTS_DIR/expand_task.py" "$TASKS_FILE" "$task_id" "$INSTANCE_DIR" 2>>"$LOG_FILE" || expand_exit=$?
+    if [[ $expand_exit -eq 0 ]]; then
+      log "Task $task_id expanded into sub-tasks, continuing loop"
+      python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "$task_id" "expanded" '{}' 2>/dev/null || true
+      sleep 1
+      continue  # skip execution, next iteration picks sub-tasks
+    elif [[ $expand_exit -eq 1 ]]; then
+      log "Task $task_id: items within batch_size, executing normally"
+    else
+      log "Task $task_id: auto_split error (exit=$expand_exit)"
+      sleep $SLEEP_INTERVAL
+      continue
+    fi
+  fi
+
   python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "$task_id" "started" '{"model":"'"$(get_worker_model)"'"}' 2>/dev/null || true
 
   # ─── Build prompt: 3-layer context ───
@@ -336,7 +363,7 @@ Working directory: $INSTANCE_DIR"
   worker_exit=0
 
   # Snapshot tasks.json before worker runs (for illegal modification guard)
-  cp "$TASKS_FILE" "${TASKS_FILE}.pre-task"
+  cp "$TASKS_FILE" "${TASKS_FILE}.pre-task.${task_id}"
 
   # Hard timeout: WORKER_TIMEOUT + 30s grace for cleanup
   # This kills the process tree if openclaw agent's own timeout doesn't work
@@ -459,7 +486,7 @@ for t in d['tasks']:
     pass
 
 # Simpler approach: snapshot was saved as .pre-task file
-pre_path = p + '.pre-task'
+pre_path = p + '.pre-task.' + task_id
 if os.path.exists(pre_path):
     pre = json.load(open(pre_path))
     pre_map = {t['id']: t['status'] for t in pre['tasks']}

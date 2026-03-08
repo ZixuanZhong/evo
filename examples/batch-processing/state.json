@@ -1,0 +1,11 @@
+{
+  "active": false,
+  "worker_model": "sonnet",
+  "planner_model": "opus",
+  "worker_agent": "evo",
+  "worker_timeout": 300,
+  "budget_daily": 50,
+  "budget_date": null,
+  "tasks_today": 0,
+  "recurring": false
+}
