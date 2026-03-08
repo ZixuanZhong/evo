@@ -5,7 +5,7 @@
   "worker_model": "opus",
   "planner_model": "opus",
   "budget_daily": 50,
-  "tasks_today": 0,
+  "tasks_today": 5,
   "budget_date": "2026-03-08",
   "worker_agent": "evo",
   "worker_timeout": 180,

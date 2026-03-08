@@ -294,19 +294,19 @@ $task_desc
 ## Rules
 
 1. Create the output file(s) listed above. All paths relative to: $INSTANCE_DIR
-2. After completing the work, update $TASKS_FILE:
-   - Set this task's status to 'done'
-   - Set completed_at to current ISO timestamp
-   - If this is a gate task and the gate condition passes, also set planner_trigger to true
-   - Update the summary counts
-3. If you cannot complete the task, set status to 'failed' and describe the error.
-4. Do NOT modify other tasks. Only update task $task_id.
-5. Use atomic writes for tasks.json (write to tmp file, then rename).
-6. For research tasks: USE web_search to find real papers, products, benchmarks. Do NOT fabricate citations.
-7. Write knowledge docs in Chinese (通俗易懂), code in English comments.
+2. After completing the work, mark the task as done:
+   \`\`\`bash
+   bash $SCRIPT_DIR/mark-task.sh $INSTANCE_DIR $task_id done
+   \`\`\`
+3. If you cannot complete the task, mark it as failed:
+   \`\`\`bash
+   bash $SCRIPT_DIR/mark-task.sh $INSTANCE_DIR $task_id failed \"reason here\"
+   \`\`\`
+4. ⛔ **DO NOT edit tasks.json directly.** Only use mark-task.sh. Any direct edits will be reverted.
+5. For research tasks: USE web_search to find real papers, products, benchmarks. Do NOT fabricate citations.
+6. Write knowledge docs in Chinese (通俗易懂), code in English comments.
 
-Working directory: $INSTANCE_DIR
-Tasks file: $TASKS_FILE"
+Working directory: $INSTANCE_DIR"
 
   WORKER_MODEL=$(get_worker_model)
   WORKER_AGENT=$(get_worker_agent)
