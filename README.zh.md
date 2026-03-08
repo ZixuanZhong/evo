@@ -69,7 +69,19 @@ evo create my-research "关于某个主题的调研项目"
 
 ### 2. 编写 SPEC
 
-编辑 `SPEC.md`：
+> **💡 最佳实践：让你的 agent 帮你写 SPEC。**
+>
+> 不用从零手写 `SPEC.md`，直接跟你的 OpenClaw agent（或其他 AI 助手）描述你的目标，让它来生成。推荐工作流：
+>
+> 1. 告诉 agent：*"我想调研 X"* 或 *"帮我建一个关于 Y 的 evo 实例"*
+> 2. Agent 会问你一些澄清问题 —— 范围、深度、约束、输出格式偏好
+> 3. Agent 生成完整的 `SPEC.md`，包含阶段、任务、依赖和关卡
+> 4. 你 review 并调整（手动或通过 agent），直到满意
+> 5. 运行 `evo plan` 将 SPEC 转化为 `tasks.json`
+>
+> 这样更快，生成的 SPEC 结构更好，而且能提前发现缺失的依赖关系。
+
+也可以手动编写。编辑 `SPEC.md`：
 
 ```markdown
 # my-research — SPEC

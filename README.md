@@ -68,7 +68,19 @@ This creates `~/.openclaw/evo/instances/my-research/` with:
 
 ### 2. Write Your SPEC
 
-Edit `~/.openclaw/evo/instances/my-research/SPEC.md`:
+> **💡 Best Practice: Let your agent write the SPEC for you.**
+>
+> Instead of writing `SPEC.md` from scratch, describe your goal to your OpenClaw agent (or any AI assistant) and let it generate the SPEC. A good workflow:
+>
+> 1. Tell your agent: *"I want to research X"* or *"Build me an evo instance for Y"*
+> 2. The agent asks clarifying questions — scope, depth, constraints, output format preferences
+> 3. The agent generates a complete `SPEC.md` with phases, tasks, dependencies, and gates
+> 4. You review and adjust (manually or via the agent) until it looks right
+> 5. Run `evo plan` to convert the SPEC into `tasks.json`
+>
+> This is faster, produces better-structured SPECs, and catches missing dependencies early.
+
+You can also write it manually. Edit `~/.openclaw/evo/instances/my-research/SPEC.md`:
 
 ```markdown
 # my-research — SPEC
