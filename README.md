@@ -19,7 +19,7 @@ SPEC.md → Planner → tasks.json → Worker Loop → Output Files
 ## Features
 
 - 🔄 **Phased execution** — tasks organized by phase, gates control progression
-- 🔀 **Dual runner** — `agent` (full tools: web search, plugins) or `claude` (local-only, fast)
+- 🔀 **Multi-runner** — `agent` (full tools, API tokens), `claude` / `codex` / `gemini` (coding CLIs, subscription plans)
 - 🛡️ **Anti-stuck mechanisms** — L0 stale reset, L0.5 deadlock breaker, L0.75 auto-escalation
 - 📊 **Budget control** — daily task limits prevent runaway costs
 - 🔔 **Discord notifications** — gate passes, completions, circuit breakers (optional)
@@ -209,8 +209,12 @@ Set these in `~/.openclaw/evo/.env` (auto-loaded by CLI).
 
 Each task has a `runner` field:
 
-- **`agent`** — Runs via `openclaw agent`. Full tools: web_search, web_fetch, plugins. Use for research tasks.
-- **`claude`** — Runs via `claude -p`. Local tools only (Bash, Read, Write, Edit). Faster, cheaper. Use for code generation, gates.
+- **`agent`** — Runs via `openclaw agent`. Full tools: web_search, web_fetch, plugins. Uses API tokens. Best for research tasks needing internet or plugins.
+- **`claude`** — Runs via `claude -p`. Local tools (Bash, Read, Write, Edit). Uses Claude subscription. Faster, cheaper. Good for code generation, gates.
+- **`codex`** — Runs via `codex exec`. Local tools + optional web search (auto-enabled for research tasks). Uses OpenAI/Codex subscription. Full-auto, full disk access. Good for code generation, refactoring.
+- **`gemini`** — Runs via `gemini -p`. Local tools in sandbox. Uses Gemini subscription. Yolo (auto-approve) mode. Good for code generation, analysis, writing.
+
+> **Cost tip**: Prefer `claude`/`codex`/`gemini` over `agent` when the task doesn't need web access or OpenClaw plugins — they use subscription plans instead of API tokens.
 
 ## Directory Structure
 

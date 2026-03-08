@@ -57,7 +57,12 @@ $TASKS_CONTENT
    - depends_on: array of task IDs
    - output_files: array of expected output file paths
    - type: 'task' or 'gate'
-   - runner: 'agent' or 'claude' — use 'agent' for tasks needing web_search/web_fetch (research, fetching URLs, checking latest info); use 'claude' for local-only tasks (code generation, writing docs from existing context, file manipulation, gates)
+   - runner: 'agent', 'claude', 'codex', or 'gemini'
+     • 'agent' — OpenClaw agent with full tools (web_search, web_fetch, memory, plugins). Uses notac API tokens. Best for research, fetching URLs, checking latest info.
+     • 'claude' — Claude Code CLI (claude -p). Local tools only (Bash, Read, Write, Edit). Uses Claude subscription. Fast, no session overhead. Good for code generation, writing docs, gates.
+     • 'codex' — Codex CLI (codex exec). Local tools + optional web search. Uses OpenAI/Codex subscription. Good for code generation, refactoring, code review.
+     • 'gemini' — Gemini CLI (gemini -p). Local tools. Uses Gemini subscription. Good for code generation, analysis, writing.
+     Prefer 'claude'/'codex'/'gemini' over 'agent' when the task doesn't need web access or OpenClaw plugins — they use subscription plans instead of API tokens.
    - started_at: null, completed_at: null, error: null, attempts: 0
 4. Update plan_version (increment by 1).
 5. Update the phase field to the current phase name.

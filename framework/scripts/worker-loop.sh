@@ -326,31 +326,81 @@ Working directory: $INSTANCE_DIR"
   # Clean stale session locks before starting (prevents lock contention from prior crashes)
   find "$HOME/.openclaw/agents/${WORKER_AGENT}/sessions/" -name "*.lock" -mmin +5 -delete 2>/dev/null || true
 
-  if [[ "$task_runner" == "claude" ]]; then
-    # ─── claude -p: local-only, no web, fast, no session overhead ───
-    log "Executing via claude -p (runner=claude), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
-    (
-      unset CLAUDECODE 2>/dev/null || true
-      cd "$INSTANCE_DIR"
-      claude -p "$(cat "$PROMPT_FILE")" \
-        --allowedTools "Bash,Read,Write,Edit" \
-        --output-format text \
-        --max-turns 50 \
-        --model "$WORKER_MODEL" 2>&1
-    ) >> "$LOG_FILE" 2>&1 &
-    WORKER_PID=$!
-  else
-    # ─── openclaw agent: full tools (web_search, web_fetch, memory, plugins) ───
-    log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
-    SESSION_ID="evo-${INSTANCE_NAME}-${task_id}-$(date +%s)"
-    openclaw agent \
-      --agent "$WORKER_AGENT" \
-      --session-id "$SESSION_ID" \
-      --message "You are a research Worker in an Evolution Loop. Read the task prompt file and execute it: $PROMPT_FILE" \
-      --timeout "$WORKER_TIMEOUT" \
-      2>>"$LOG_FILE" >> "$LOG_FILE" &
-    WORKER_PID=$!
-  fi
+  case "$task_runner" in
+    claude)
+      # ─── claude -p: local-only, no web, fast, uses Claude subscription ───
+      log "Executing via claude -p (runner=claude), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
+      (
+        unset CLAUDECODE 2>/dev/null || true
+        cd "$INSTANCE_DIR"
+        claude -p "$(cat "$PROMPT_FILE")" \
+          --allowedTools "Bash,Read,Write,Edit" \
+          --output-format text \
+          --max-turns 50 \
+          --model "$WORKER_MODEL" 2>&1
+      ) >> "$LOG_FILE" 2>&1 &
+      WORKER_PID=$!
+      ;;
+
+    codex)
+      # ─── codex exec: local tools + optional web, uses Codex/OpenAI subscription ───
+      # Model override: state.json worker_model applies (e.g. o3, o4-mini, codex-mini)
+      CODEX_MODEL="${WORKER_MODEL}"
+      # Map common aliases to codex-compatible model names
+      case "$CODEX_MODEL" in
+        sonnet|opus|haiku) CODEX_MODEL="o4-mini" ;;  # default fallback for non-OpenAI aliases
+      esac
+      CODEX_EXTRA_FLAGS=""
+      # Enable web search if task is agent-like (research)
+      if echo "$task_json" | python3 -c "import json,sys; t=json.load(sys.stdin); sys.exit(0 if 'research' in t.get('title','').lower() or 'research' in t.get('description','').lower() else 1)" 2>/dev/null; then
+        CODEX_EXTRA_FLAGS="--web-search"
+      fi
+      log "Executing via codex exec (runner=codex), model: $CODEX_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
+      (
+        cd "$INSTANCE_DIR"
+        codex exec \
+          --model "$CODEX_MODEL" \
+          --full-auto \
+          --sandbox danger-full-access \
+          $CODEX_EXTRA_FLAGS \
+          "$(cat "$PROMPT_FILE")" 2>&1
+      ) >> "$LOG_FILE" 2>&1 &
+      WORKER_PID=$!
+      ;;
+
+    gemini)
+      # ─── gemini -p: local tools, uses Gemini subscription ───
+      GEMINI_MODEL="${WORKER_MODEL}"
+      # Map common aliases to gemini-compatible model names
+      case "$GEMINI_MODEL" in
+        sonnet|opus|haiku) GEMINI_MODEL="gemini-2.5-pro" ;;  # default fallback for non-Google aliases
+      esac
+      log "Executing via gemini -p (runner=gemini), model: $GEMINI_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
+      (
+        cd "$INSTANCE_DIR"
+        gemini \
+          --model "$GEMINI_MODEL" \
+          --prompt "$(cat "$PROMPT_FILE")" \
+          --sandbox \
+          --yolo \
+          --output-format text 2>&1
+      ) >> "$LOG_FILE" 2>&1 &
+      WORKER_PID=$!
+      ;;
+
+    agent|*)
+      # ─── openclaw agent: full tools (web_search, web_fetch, memory, plugins) — uses notac tokens ───
+      log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
+      SESSION_ID="evo-${INSTANCE_NAME}-${task_id}-$(date +%s)"
+      openclaw agent \
+        --agent "$WORKER_AGENT" \
+        --session-id "$SESSION_ID" \
+        --message "You are a research Worker in an Evolution Loop. Read the task prompt file and execute it: $PROMPT_FILE" \
+        --timeout "$WORKER_TIMEOUT" \
+        2>>"$LOG_FILE" >> "$LOG_FILE" &
+      WORKER_PID=$!
+      ;;
+  esac
 
   # ─── Hard timeout watchdog ───
   (

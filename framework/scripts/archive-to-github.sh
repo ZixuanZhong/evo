@@ -7,7 +7,7 @@ INSTANCE_DIR="$1"
 INSTANCE_NAME=$(basename "$INSTANCE_DIR")
 REPO="${EVO_ARCHIVE_REPO:-}"
 [[ -n "$REPO" ]] || { echo "[archive] EVO_ARCHIVE_REPO not set, skipping archive" >&2; exit 0; }
-CLONE_DIR="/tmp/evo-instances-push-$$"
+CLONE_DIR="${TMPDIR:-/tmp}/evo-instances-push-$$"
 
 log() { echo "[archive] $*"; }
 

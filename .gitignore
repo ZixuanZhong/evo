@@ -1,13 +1,11 @@
-# Instance runtime files
-instances/*/logs/*.log
-instances/*/logs/*.log.*
-instances/*/logs/.worker-prompt-*
-instances/*/logs/worker.pid
-instances/*/*.lock
-*.tmp
+# Instance runtime data (use examples/ for templates)
+instances/
 
 # Environment (may contain secrets)
 .env
+
+# Temp files
+*.tmp
 
 # macOS
 .DS_Store

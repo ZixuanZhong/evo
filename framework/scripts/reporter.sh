@@ -99,9 +99,10 @@ print()
 for t in d['tasks']:
     status_icon = {'pending': '⬜', 'in_progress': '🔵', 'done': '✅', 'failed': '❌', 'escalated': '🟠'}.get(t['status'], '?')
     gate = ' [GATE]' if t.get('type') == 'gate' else ''
+    runner = f' [{t[\"runner\"]}]' if t.get('runner', 'agent') != 'agent' else ''
     attempts = f' (x{t[\"attempts\"]})' if t.get('attempts', 0) > 1 else ''
     err = f' — {t[\"error\"]}' if t.get('error') else ''
-    print(f'{status_icon} {t[\"id\"]} {t[\"title\"]}{gate}{attempts}{err}')
+    print(f'{status_icon} {t[\"id\"]} {t[\"title\"]}{gate}{runner}{attempts}{err}')
 "
 }
 
