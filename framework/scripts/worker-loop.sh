@@ -316,6 +316,9 @@ Tasks file: $TASKS_FILE"
   echo "$PROMPT" > "$PROMPT_FILE"
   worker_exit=0
 
+  # Snapshot tasks.json before worker runs (for illegal modification guard)
+  cp "$TASKS_FILE" "${TASKS_FILE}.pre-task"
+
   # Hard timeout: WORKER_TIMEOUT + 30s grace for cleanup
   # This kills the process tree if openclaw agent's own timeout doesn't work
   HARD_TIMEOUT=$((WORKER_TIMEOUT + 30))
@@ -371,6 +374,43 @@ Tasks file: $TASKS_FILE"
   wait "$WATCHDOG_PID" 2>/dev/null
 
   rm -f "$PROMPT_FILE" 2>/dev/null
+
+  # Guard: restore any tasks the worker illegally modified (only current task may change)
+  python3 -c "
+import json, tempfile, os
+p = '$TASKS_FILE'
+task_id = '$task_id'
+d = json.load(open(p))
+fixed = 0
+for t in d['tasks']:
+    if t['id'] == task_id:
+        continue
+    # If worker changed a non-current pending/in_progress task to done, revert it
+    # We saved pre_statuses before; compare with snapshot
+    pass
+
+# Simpler approach: snapshot was saved as .pre-task file
+pre_path = p + '.pre-task'
+if os.path.exists(pre_path):
+    pre = json.load(open(pre_path))
+    pre_map = {t['id']: t['status'] for t in pre['tasks']}
+    for t in d['tasks']:
+        if t['id'] == task_id:
+            continue
+        old_status = pre_map.get(t['id'])
+        if old_status and t['status'] != old_status:
+            print(f'[GUARD] Reverting {t[\"id\"]} from {t[\"status\"]} back to {old_status} (worker modified illegally)')
+            t['status'] = old_status
+            fixed += 1
+    if fixed > 0:
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), suffix='.tmp')
+        with os.fdopen(fd, 'w') as f:
+            json.dump(d, f, indent=2, ensure_ascii=False)
+            f.write('\n')
+        os.rename(tmp, p)
+        print(f'[GUARD] Fixed {fixed} illegally modified tasks')
+    os.remove(pre_path)
+" 2>>"$LOG_FILE" || true
 
   # Verify task was updated (fallback if agent didn't)
   current_status=$(python3 -c "
