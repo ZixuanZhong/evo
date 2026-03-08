@@ -1,7 +1,7 @@
-# Workspace 扫描报告
+# Workspace 扫描報告
 
-**扫描时间**: 2026-03-07 01:44 UTC
-**Stale 阈值**: 7 天未修改
+**扫描时间**: 2026-03-08 01:30 UTC
+**Stale 阈值**: 7 天
 
 ## workspace-alpha (11 files, 0 stale)
 
@@ -19,7 +19,7 @@
 | `memory/2026-03-05-cron-v2-fix.md` | 1.8KB | 2026-03-05 19:53 | ✅ fresh |
 | `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
-## workspace-core (107 files, 0 stale)
+## workspace-core (107 files, 9 stale)
 
 | 文件 | 大小 | 最后修改 | 状态 |
 |------|------|---------|------|
@@ -28,10 +28,10 @@
 | `.learnings/ERRORS.md` | 70B | 2026-03-03 12:27 | ✅ fresh |
 | `.learnings/FEATURE_REQUESTS.md` | 75B | 2026-03-03 12:27 | ✅ fresh |
 | `.learnings/LEARNINGS.md` | 105B | 2026-03-03 12:27 | ✅ fresh |
-| `.openclaw/workspace-state.json` | 125B | 2026-02-28 19:30 | ✅ fresh |
+| `.openclaw/workspace-state.json` | 125B | 2026-02-28 19:30 | 🟡 stale (7d) |
 | `AGENTS.md` | 10.1KB | 2026-03-07 00:21 | ✅ fresh |
-| `HEARTBEAT.md` | 168B | 2026-02-28 05:13 | ✅ fresh |
-| `IDENTITY.md` | 202B | 2026-02-28 08:56 | ✅ fresh |
+| `HEARTBEAT.md` | 168B | 2026-02-28 05:13 | 🟡 stale (8d) |
+| `IDENTITY.md` | 202B | 2026-02-28 08:56 | 🟡 stale (8d) |
 | `MEMORY.md` | 7.9KB | 2026-03-06 18:58 | ✅ fresh |
 | `SHARED-FACTS.md` | 5.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `SOUL.md` | 3.1KB | 2026-03-06 18:58 | ✅ fresh |
@@ -61,12 +61,12 @@
 | `playbooks/agent-tax.md` | 3.7KB | 2026-03-03 16:01 | ✅ fresh |
 | `playbooks/cost-and-models.md` | 3.5KB | 2026-03-05 05:08 | ✅ fresh |
 | `playbooks/disaster-recovery.md` | 3.4KB | 2026-03-05 05:09 | ✅ fresh |
-| `playbooks/long-document-workflows.md` | 1.0KB | 2026-02-28 13:35 | ✅ fresh |
+| `playbooks/long-document-workflows.md` | 1.0KB | 2026-02-28 13:35 | 🟡 stale (7d) |
 | `playbooks/multi-agent-core-sync.md` | 1.9KB | 2026-03-05 06:04 | ✅ fresh |
 | `playbooks/new-agent-setup.md` | 4.6KB | 2026-03-05 05:09 | ✅ fresh |
 | `playbooks/nightly-evolution.md` | 10.8KB | 2026-03-05 07:25 | ✅ fresh |
 | `playbooks/rollback-window.md` | 1.6KB | 2026-03-06 19:00 | ✅ fresh |
-| `playbooks/skill-security-review.md` | 1.2KB | 2026-02-28 13:45 | ✅ fresh |
+| `playbooks/skill-security-review.md` | 1.2KB | 2026-02-28 13:45 | 🟡 stale (7d) |
 | `scripts/agent-core-link.sh` | 1.2KB | 2026-03-05 06:02 | ✅ fresh |
 | `scripts/agent-core-unlink.sh` | 622B | 2026-03-01 09:31 | ✅ fresh |
 | `scripts/config-guard.sh` | 2.3KB | 2026-03-06 19:03 | ✅ fresh |
@@ -121,10 +121,10 @@
 | `skills/stock-strategy-backtester/agents/openai.yaml` | 278B | 2026-03-03 10:45 | ✅ fresh |
 | `skills/stock-strategy-backtester/references/backtest-metrics.md` | 1.8KB | 2026-03-03 10:45 | ✅ fresh |
 | `skills/stock-strategy-backtester/scripts/backtest_strategy.py` | 13.8KB | 2026-03-03 10:45 | ✅ fresh |
-| `skills/tax-professional/.clawhub/origin.json` | 148B | 2026-02-28 13:44 | ✅ fresh |
-| `skills/tax-professional/SKILL.md` | 34.7KB | 2026-02-28 13:44 | ✅ fresh |
-| `skills/tax-professional/_meta.json` | 135B | 2026-02-28 13:44 | ✅ fresh |
-| `skills/tax-professional/references/common-writeoffs.md` | 2.5KB | 2026-02-28 13:44 | ✅ fresh |
+| `skills/tax-professional/.clawhub/origin.json` | 148B | 2026-02-28 13:44 | 🟡 stale (7d) |
+| `skills/tax-professional/SKILL.md` | 34.7KB | 2026-02-28 13:44 | 🟡 stale (7d) |
+| `skills/tax-professional/_meta.json` | 135B | 2026-02-28 13:44 | 🟡 stale (7d) |
+| `skills/tax-professional/references/common-writeoffs.md` | 2.5KB | 2026-02-28 13:44 | 🟡 stale (7d) |
 | `templates/daily-note.md` | 360B | 2026-03-05 05:22 | ✅ fresh |
 | `templates/playbook.md` | 572B | 2026-03-05 05:22 | ✅ fresh |
 | `templates/shared-fact.md` | 433B | 2026-03-05 05:22 | ✅ fresh |
@@ -159,7 +159,7 @@
 | `USER.md` | 2.6KB | 2026-03-03 03:41 | ✅ fresh |
 | `aliases.json` | 2B | 2026-03-03 11:00 | ✅ fresh |
 | `collection-worker-daily.json` | 286.6KB | 2026-03-02 20:16 | ✅ fresh |
-| `collection-worker.js` | 14.1KB | 2026-03-05 04:09 | ✅ fresh |
+| `collection-worker.js` | 18.7KB | 2026-03-07 17:39 | ✅ fresh |
 | `data/expense-tracking/DEPRECATED.md` | 369B | 2026-03-03 22:16 | ✅ fresh |
 | `data/expense-tracking/README.md` | 1.7KB | 2026-03-02 12:07 | ✅ fresh |
 | `data/expense-tracking/monthly/2026-02.md` | 2.1KB | 2026-03-03 20:15 | ✅ fresh |
@@ -182,38 +182,38 @@
 | `skills/health/sleep-shortcut-steps.md` | 2.0KB | 2026-03-02 09:21 | ✅ fresh |
 | `skills/journal/SKILL.md` | 20.0KB | 2026-03-06 10:17 | ✅ fresh |
 | `skills/location/SKILL.md` | 11.2KB | 2026-03-07 00:21 | ✅ fresh |
-| `skills/location/known-places.json` | 1.5KB | 2026-03-06 05:38 | ✅ fresh |
+| `skills/location/known-places.json` | 2.0KB | 2026-03-07 17:36 | ✅ fresh |
 | `skills/vault/SKILL.md` | 3.7KB | 2026-03-06 10:18 | ✅ fresh |
 | `skills/workflowy/.clawhub/origin.json` | 141B | 2026-03-02 06:26 | ✅ fresh |
 | `skills/workflowy/SKILL.md` | 6.8KB | 2026-03-02 11:40 | ✅ fresh |
 | `skills/workflowy/_meta.json` | 128B | 2026-03-02 06:26 | ✅ fresh |
 | `timezone.json` | 692B | 2026-03-07 00:10 | ✅ fresh |
 
-## workspace-tax (27 files, 0 stale)
+## workspace-tax (27 files, 13 stale)
 
 | 文件 | 大小 | 最后修改 | 状态 |
 |------|------|---------|------|
-| `.backup-before-core-20260301-012822/AGENTS.md` | 1.5KB | 2026-02-28 16:11 | ✅ fresh |
-| `.backup-before-core-20260301-012822/SOUL.md` | 2.5KB | 2026-02-28 19:51 | ✅ fresh |
-| `.backup-before-core-20260301-012822/TOOLS.md` | 860B | 2026-02-28 15:20 | ✅ fresh |
-| `.backup-before-core-20260301-012822/playbooks/agent-tax.md` | 3.5KB | 2026-02-28 19:51 | ✅ fresh |
-| `.openclaw/workspace-state.json` | 74B | 2026-02-28 15:20 | ✅ fresh |
-| `2025/01-income/2025-W2-Siyu-Peng-Meta.pdf` | 740.8KB | 2026-02-28 23:39 | ✅ fresh |
-| `2025/01-income/2025-W2-Zixuan-Zhong-TikTok.pdf` | 93.5KB | 2026-02-28 23:36 | ✅ fresh |
-| `2025/05-exports/2025-W2-summary-Zixuan-Zhong.md` | 1.4KB | 2026-02-28 23:36 | ✅ fresh |
+| `.backup-before-core-20260301-012822/AGENTS.md` | 1.5KB | 2026-02-28 16:11 | 🟡 stale (7d) |
+| `.backup-before-core-20260301-012822/SOUL.md` | 2.5KB | 2026-02-28 19:51 | 🟡 stale (7d) |
+| `.backup-before-core-20260301-012822/TOOLS.md` | 860B | 2026-02-28 15:20 | 🟡 stale (7d) |
+| `.backup-before-core-20260301-012822/playbooks/agent-tax.md` | 3.5KB | 2026-02-28 19:51 | 🟡 stale (7d) |
+| `.openclaw/workspace-state.json` | 74B | 2026-02-28 15:20 | 🟡 stale (7d) |
+| `2025/01-income/2025-W2-Siyu-Peng-Meta.pdf` | 740.8KB | 2026-02-28 23:39 | 🟡 stale (7d) |
+| `2025/01-income/2025-W2-Zixuan-Zhong-TikTok.pdf` | 93.5KB | 2026-02-28 23:36 | 🟡 stale (7d) |
+| `2025/05-exports/2025-W2-summary-Zixuan-Zhong.md` | 1.4KB | 2026-02-28 23:36 | 🟡 stale (7d) |
 | `2025/05-exports/day1-1040-instruction-notes.md` | 4.3KB | 2026-03-03 16:01 | ✅ fresh |
 | `2025/05-exports/day2-income-capital-notes.md` | 11.1KB | 2026-03-04 16:02 | ✅ fresh |
 | `2025/05-exports/day3-deduction-credit-notes.md` | 7.9KB | 2026-03-05 16:02 | ✅ fresh |
 | `AGENTS.md` | 10.1KB | 2026-03-07 00:21 | ✅ fresh |
-| `HEARTBEAT.md` | 168B | 2026-02-28 15:20 | ✅ fresh |
-| `IDENTITY.md` | 230B | 2026-02-28 16:11 | ✅ fresh |
+| `HEARTBEAT.md` | 168B | 2026-02-28 15:20 | 🟡 stale (7d) |
+| `IDENTITY.md` | 230B | 2026-02-28 16:11 | 🟡 stale (7d) |
 | `SHARED-FACTS.md` | 5.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `SOUL.md` | 3.1KB | 2026-03-06 18:58 | ✅ fresh |
 | `TOOLS.md` | 1.0KB | 2026-03-01 09:03 | ✅ fresh |
-| `USER.md` | 495B | 2026-02-28 22:58 | ✅ fresh |
-| `data/tax-professional/2025-expenses.json` | 1.9KB | 2026-02-28 23:39 | ✅ fresh |
+| `USER.md` | 495B | 2026-02-28 22:58 | 🟡 stale (7d) |
+| `data/tax-professional/2025-expenses.json` | 1.9KB | 2026-02-28 23:39 | 🟡 stale (7d) |
 | `data/tax-professional/2025-irs-instructions-week-todo.md` | 3.6KB | 2026-03-05 16:02 | ✅ fresh |
-| `data/tax-professional/tax-profile.md` | 684B | 2026-02-28 22:58 | ✅ fresh |
+| `data/tax-professional/tax-profile.md` | 684B | 2026-02-28 22:58 | 🟡 stale (7d) |
 | `memory/2026-02-28.md` | 688B | 2026-03-05 10:31 | ✅ fresh |
 | `memory/2026-03-01.md` | 836B | 2026-03-05 10:31 | ✅ fresh |
 | `memory/2026-03-03.md` | 929B | 2026-03-05 10:31 | ✅ fresh |
@@ -223,9 +223,9 @@
 
 ## 汇总
 
-| 指标 | 数值 |
-|------|------|
-| Workspaces | 5 |
-| 总文件数 | 193 |
-| Stale (>7天) | 0 |
-| Fresh | 193 |
+|指标|数值|
+|---|---|
+|Workspaces|5|
+|总文件数|193|
+|Stale|22|
+|Fresh|171|

@@ -1,8 +1,14 @@
-# SHARED-FACTS 同步报告 — 2026-03-07
+# SHARED-FACTS 同步报告 — 2026-03-08
 
-扫描最近 7 天带 `cross-ref` 的 daily notes 后，未发现新的跨 agent 事实。
+## 变更
 
-本次未编辑 SHARED-FACTS.md。
+| 操作 | 条目 | 原因 |
+|------|------|------|
+| SUPERSEDED | `[timezone][travel]` | Caton 已抵达马德里，不再是"即将" |
+| 新增 | `[timezone][auto-update]` | `update-cron-timezone.sh` 自动化脚本，影响所有 agent cron |
+
+## 已确认有效（未变更）
+- timezone iron-rule, cron-v2-mandatory, tax-2025 obbb — 全部仍有效
 
 ---
 *Synced by nightly-evolution task 2.2*

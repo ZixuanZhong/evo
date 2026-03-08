@@ -1,7 +1,7 @@
-# Cross-Workspace Symlink 检查 — 2026-03-07
+# Symlink 检查 — 2026-03-08
 
-| Workspace | 文件 | 类型 | 可解析 |
-|-----------|------|------|--------|
+| Workspace | 文件 | 类型 | OK |
+|---|---|---|---|
 | workspace-alpha | AGENTS.md | symlink | ✅ |
 | workspace-alpha | SOUL.md | symlink | ✅ |
 | workspace-alpha | TOOLS.md | symlink | ✅ |
@@ -27,9 +27,9 @@
 | workspace-evo | playbooks | 缺失 | N/A |
 | workspace-evo | timezone.json | symlink | ✅ |
 
-断裂 symlink: **0**
+断裂: **0**
 
-**未做修改。**
+**未修改。**
 
 ---
-*Review by nightly-evolution task 1.3*
+*task 1.3*

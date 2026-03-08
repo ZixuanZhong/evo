@@ -16,8 +16,8 @@
       "status": "done",
       "attempts": 2,
       "runner": "agent",
-      "started_at": "2026-03-07T01:43:53.665662+00:00",
-      "completed_at": "2026-03-07T01:44:26.182785+00:00"
+      "started_at": "2026-03-08T01:30:05.405583+00:00",
+      "completed_at": "2026-03-08T01:30:26.464772+00:00"
     },
     {
       "id": "1.1",
@@ -31,9 +31,8 @@
       "status": "done",
       "attempts": 2,
       "runner": "agent",
-      "started_at": "2026-03-07T02:10:49.980282+00:00",
-      "error": "Worker exited with code 1",
-      "completed_at": "2026-03-07T07:28:10.839379+00:00"
+      "started_at": "2026-03-08T01:30:42.023135+00:00",
+      "completed_at": "2026-03-08T01:31:03.394920+00:00"
     },
     {
       "id": "1.2",
@@ -45,11 +44,9 @@
       ],
       "output_file": "output/review-playbooks.md",
       "status": "done",
-      "attempts": 2,
+      "attempts": 1,
       "runner": "agent",
-      "started_at": "2026-03-07T04:55:07.739544+00:00",
-      "error": "Worker exited with code 1",
-      "completed_at": "2026-03-07T07:28:10.839379+00:00"
+      "completed_at": "2026-03-08T01:31:03.394920+00:00"
     },
     {
       "id": "1.3",
@@ -59,10 +56,9 @@
       "depends_on": [],
       "output_file": "output/review-symlinks.md",
       "status": "done",
-      "attempts": 2,
+      "attempts": 1,
       "runner": "agent",
-      "started_at": "2026-03-07T07:27:31.711978+00:00",
-      "completed_at": "2026-03-07T07:28:10.839379+00:00"
+      "completed_at": "2026-03-08T01:31:03.394920+00:00"
     },
     {
       "id": "1.4",
@@ -72,9 +68,10 @@
       "depends_on": [],
       "output_file": "output/review-health.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:04:16.455050+00:00"
+      "started_at": "2026-03-08T01:31:17.128386+00:00",
+      "completed_at": "2026-03-08T01:31:52.741907+00:00"
     },
     {
       "id": "2.1",
@@ -86,9 +83,10 @@
       ],
       "output_file": "output/distill-memory.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:04:42.898333+00:00"
+      "started_at": "2026-03-08T01:32:09.358466+00:00",
+      "completed_at": "2026-03-08T01:33:58.186715+00:00"
     },
     {
       "id": "2.2",
@@ -100,9 +98,10 @@
       ],
       "output_file": "output/sync-shared-facts.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:05:00.734230+00:00"
+      "started_at": "2026-03-08T01:34:13.135033+00:00",
+      "completed_at": "2026-03-08T01:34:51.164023+00:00"
     },
     {
       "id": "3.1",
@@ -112,9 +111,10 @@
       "depends_on": [],
       "output_file": "output/community-openclaw.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:11:33.640267+00:00"
+      "started_at": "2026-03-08T01:35:07.214480+00:00",
+      "completed_at": "2026-03-08T01:35:39.509757+00:00"
     },
     {
       "id": "3.2",
@@ -124,9 +124,10 @@
       "depends_on": [],
       "output_file": "output/community-ai.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:11:33.640267+00:00"
+      "started_at": "2026-03-08T01:35:56.131281+00:00",
+      "completed_at": "2026-03-08T01:36:36.108014+00:00"
     },
     {
       "id": "3.3",
@@ -136,9 +137,10 @@
       "depends_on": [],
       "output_file": "output/community-vertical.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:11:33.640267+00:00"
+      "started_at": "2026-03-08T01:36:50.769078+00:00",
+      "completed_at": "2026-03-08T01:37:26.845449+00:00"
     },
     {
       "id": "4.1",
@@ -150,9 +152,10 @@
       ],
       "output_file": "output/git-push.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:12:05.331714+00:00"
+      "started_at": "2026-03-08T01:37:42.709297+00:00",
+      "completed_at": "2026-03-08T01:38:16.761423+00:00"
     },
     {
       "id": "4.G",
@@ -167,9 +170,10 @@
       ],
       "output_file": "output/summary.md",
       "status": "done",
-      "attempts": 1,
+      "attempts": 2,
       "runner": "agent",
-      "completed_at": "2026-03-07T08:12:37.253248+00:00"
+      "started_at": "2026-03-08T01:38:30.401027+00:00",
+      "completed_at": "2026-03-08T01:39:03.942811+00:00"
     }
   ],
   "summary": {
