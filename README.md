@@ -19,7 +19,8 @@ SPEC.md → Planner → tasks.json → Worker Loop → Output Files
 ## Features
 
 - 🔄 **Phased execution** — tasks organized by phase, gates control progression
-- 🔀 **Multi-runner** — `agent` (full tools, API tokens), `claude` / `codex` / `gemini` (coding CLIs, subscription plans)
+- 🔀 **Multiple runner types** — `agent` (full tools, API tokens), `claude` / `codex` / `gemini` (coding CLIs, subscription plans)
+- ⚡ **Parallel workers** — run multiple worker loops concurrently to speed up independent tasks
 - 🛡️ **Anti-stuck mechanisms** — L0 stale reset, L0.5 deadlock breaker, L0.75 auto-escalation
 - 📊 **Budget control** — daily task limits prevent runaway costs
 - 🔔 **Discord notifications** — gate passes, completions, circuit breakers (optional)
@@ -198,11 +199,11 @@ If `file-list.txt` has 12 items with `batch_size: 5`, the worker automatically c
 | Command | Description |
 |---------|-------------|
 | `evo create <name> "<desc>"` | Create new instance with scaffolding |
-| `evo start <name>` | Start the worker loop (background) |
-| `evo stop <name>` | Stop the worker loop |
+| `evo start <name> [-w N]` | Start worker loop(s) (N=parallel workers) |
+| `evo stop <name>` | Stop all worker loops |
 | `evo status [name]` | Show status (all instances or one) |
 | `evo status --json` | Machine-readable status output |
-| `evo logs <name> [--follow]` | View worker logs |
+| `evo logs <name> [--follow] [--worker ID]` | View worker logs |
 | `evo plan <name>` | Run the AI planner |
 | `evo reset <name> [--force]` | Reset tasks to pending |
 | `evo integrate <name>` | Show output routing suggestions |
@@ -232,6 +233,7 @@ Set these in `~/.openclaw/evo/.env` (auto-loaded by CLI).
 | `planner_model` | `opus` | Model for planner |
 | `worker_agent` | `evo` | OpenClaw agent ID for `agent` runner |
 | `worker_timeout` | `600` | Timeout per task (seconds) |
+| `workers` | `1` | Number of parallel worker loops |
 | `budget_daily` | `50` | Max tasks per day |
 | `recurring` | `false` | Whether instance supports `evo reset` from template |
 
@@ -285,6 +287,47 @@ Each task has a `runner` field:
     ├── nightly-evolution/        # Recurring nightly tasks
     └── batch-processing/         # Auto-split demo
 ```
+
+## Parallel Workers
+
+By default, each instance runs a single worker loop. For instances with many independent tasks, you can run multiple workers in parallel:
+
+```bash
+# Start with 3 parallel workers
+evo start my-research --workers 3
+
+# Or set default in state.json
+# "workers": 3
+```
+
+Each worker independently picks tasks from the queue (`pick_next_task.py` uses file locking for safe concurrent access). Workers are fully crash-isolated — if one hangs or fails, others keep running.
+
+```bash
+# View status — shows all workers
+evo status my-research
+# Worker 1: running (PID 12345)
+# Worker 2: running (PID 12346)
+# Worker 3: running (PID 12347)
+
+# View logs per worker
+evo logs my-research --worker 2
+
+# Follow all worker logs
+evo logs my-research --follow
+
+# Stop all workers
+evo stop my-research
+```
+
+### When to Use
+
+| Workers | Best for |
+|---------|----------|
+| 1 (default) | Sequential workflows, low-cost, simple |
+| 2-3 | Instances with many independent tasks in the same phase |
+| 4+ | Large batch processing with `auto_split` |
+
+> **Note**: More workers doesn't help if tasks are strictly sequential (each depends on the previous). The speedup comes from independent tasks that can run in parallel.
 
 ## Auto-Split: Dynamic Task Expansion
 

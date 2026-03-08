@@ -5,11 +5,12 @@ set -uo pipefail
 EVO_ROOT="${EVO_ROOT:-$HOME/.openclaw/evo}"
 SCRIPTS_DIR="$EVO_ROOT/framework/scripts"
 INSTANCE_NAME="$1"
+WORKER_ID="${2:-1}"
 INSTANCE_DIR="$EVO_ROOT/instances/$INSTANCE_NAME"
 TASKS_FILE="$INSTANCE_DIR/tasks.json"
 STATE_FILE="$INSTANCE_DIR/state.json"
 SPEC_FILE="$INSTANCE_DIR/SPEC.md"
-LOG_FILE="$INSTANCE_DIR/logs/worker.log"
+LOG_FILE="$INSTANCE_DIR/logs/worker.${WORKER_ID}.log"
 CLAUDE_MD="$EVO_ROOT/framework/CLAUDE.md"
 
 SLEEP_INTERVAL=10
@@ -20,7 +21,7 @@ consecutive_failures=0
 MAX_LOG_SIZE=10485760  # 10MB
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')][W${WORKER_ID}] $*"
 }
 
 check_budget() {
@@ -362,7 +363,7 @@ Working directory: $INSTANCE_DIR"
   worker_exit=0
 
   # Snapshot tasks.json before worker runs (for illegal modification guard)
-  cp "$TASKS_FILE" "${TASKS_FILE}.pre-task"
+  cp "$TASKS_FILE" "${TASKS_FILE}.pre-task.${task_id}"
 
   # Hard timeout: WORKER_TIMEOUT + 30s grace for cleanup
   # This kills the process tree if openclaw agent's own timeout doesn't work
@@ -485,7 +486,7 @@ for t in d['tasks']:
     pass
 
 # Simpler approach: snapshot was saved as .pre-task file
-pre_path = p + '.pre-task'
+pre_path = p + '.pre-task.' + task_id
 if os.path.exists(pre_path):
     pre = json.load(open(pre_path))
     pre_map = {t['id']: t['status'] for t in pre['tasks']}

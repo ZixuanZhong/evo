@@ -9,5 +9,6 @@
   "budget_date": "CREATED_DATE",
   "worker_agent": "evo",
   "worker_timeout": 600,
+  "workers": 1,
   "daily_task_budget": 20
 }

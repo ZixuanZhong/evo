@@ -19,7 +19,8 @@ SPEC.md → 规划器 → tasks.json → Worker 循环 → 输出文件
 ## 特性
 
 - 🔄 **分阶段执行** — 任务按阶段组织，Gate 控制推进
-- 🔀 **多 Runner** — `agent`（完整工具）、`claude` / `codex` / `gemini`（本地 CLI，用订阅）
+- 🔀 **多种 Runner 类型** — `agent`（完整工具）、`claude` / `codex` / `gemini`（本地 CLI，用订阅）
+- ⚡ **并行 Worker** — 多个 worker 循环并发执行，加速独立任务
 - 🧩 **自动拆分** — `auto_split` 运行时按上游产出动态拆分子任务，避免超时
 - 🛡️ **防卡死机制** — L0 超时重置、L0.5 死锁破解、L0.75 自动升级
 - 📊 **预算控制** — 每日任务限额，防止失控
@@ -239,11 +240,11 @@ evo start my-batch
 | 命令 | 说明 |
 |------|------|
 | `evo create <name> "<desc>"` | 创建新实例 |
-| `evo start <name>` | 启动 Worker 循环（后台） |
-| `evo stop <name>` | 停止 Worker 循环 |
+| `evo start <name> [-w N]` | 启动 Worker 循环（N=并行数） |
+| `evo stop <name>` | 停止所有 Worker 循环 |
 | `evo status [name]` | 查看状态（全部或单个） |
 | `evo status --json` | 机器可读 JSON 状态 |
-| `evo logs <name> [--follow]` | 查看 Worker 日志 |
+| `evo logs <name> [--follow] [--worker ID]` | 查看 Worker 日志 |
 | `evo plan <name>` | 运行 AI 规划器 |
 | `evo reset <name> [--force]` | 重置任务为 pending |
 | `evo integrate <name>` | 显示输出路由建议 |
@@ -271,8 +272,49 @@ evo start my-batch
 | `planner_model` | `opus` | 规划器使用的模型 |
 | `worker_agent` | `evo` | `agent` runner 使用的 OpenClaw agent ID |
 | `worker_timeout` | `600` | 每个任务的超时（秒） |
+| `workers` | `1` | 并行 Worker 数量 |
 | `budget_daily` | `50` | 每日最大任务数 |
 | `recurring` | `false` | 是否支持从模板 `evo reset` |
+
+## 并行 Worker
+
+默认每个实例运行一个 worker 循环。对于有很多独立任务的实例，可以并行运行多个 worker：
+
+```bash
+# 启动 3 个并行 worker
+evo start my-research --workers 3
+
+# 或在 state.json 中设置默认值
+# "workers": 3
+```
+
+每个 worker 独立从队列中选取任务（`pick_next_task.py` 使用文件锁保证并发安全）。Worker 之间完全崩溃隔离——一个挂了不影响其他。
+
+```bash
+# 查看状态——显示所有 worker
+evo status my-research
+# Worker 1: running (PID 12345)
+# Worker 2: running (PID 12346)
+
+# 查看指定 worker 日志
+evo logs my-research --worker 2
+
+# 跟踪所有 worker 日志
+evo logs my-research --follow
+
+# 停止所有 worker
+evo stop my-research
+```
+
+### 何时使用
+
+| Worker 数 | 适用场景 |
+|-----------|---------|
+| 1（默认） | 顺序工作流、低成本、简单场景 |
+| 2-3 | 同阶段有多个独立任务 |
+| 4+ | 大批量处理（配合 `auto_split`） |
+
+> **注意**：如果任务严格顺序依赖（每个都依赖上一个），多 worker 不会有加速效果。加速来自可并行的独立任务。
 
 ## 自动拆分（auto_split）
 

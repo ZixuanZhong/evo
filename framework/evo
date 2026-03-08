@@ -68,17 +68,58 @@ cmd_create() {
   echo "  Next: edit $inst_dir/SPEC.md, then run 'evo start $name'"
 }
 
+get_workers() {
+  local state_file="$1"
+  python3 -c "import json; print(json.load(open('$state_file')).get('workers', 1))" 2>/dev/null || echo "1"
+}
+
 cmd_start() {
   local name="${1:-}"
-  [[ -n "$name" ]] || die "Usage: evo start <name>"
+  local workers_override="${2:-}"
+  [[ -n "$name" ]] || die "Usage: evo start <name> [--workers N]"
+
+  # Parse --workers flag
+  local w_flag=""
+  shift 2>/dev/null || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --workers|-w) w_flag="${2:-}"; shift ;;
+      *) ;;
+    esac
+    shift 2>/dev/null || true
+  done
+
   ensure_instance "$name"
-
   local inst_dir="$INSTANCES_DIR/$name"
-  local wpf
-  wpf=$(pid_file "$name" "worker")
 
-  if is_running "$wpf"; then
-    echo "Worker already running (PID $(cat "$wpf"))"
+  # Determine worker count: CLI flag > state.json > default 1
+  local num_workers
+  if [[ -n "$w_flag" ]]; then
+    num_workers="$w_flag"
+  else
+    num_workers=$(get_workers "$inst_dir/state.json")
+  fi
+  [[ "$num_workers" -ge 1 ]] 2>/dev/null || num_workers=1
+
+  # Check if any worker already running
+  local already_running=0
+  for i in $(seq 1 "$num_workers"); do
+    local wpf
+    wpf=$(pid_file "$name" "worker.${i}")
+    if is_running "$wpf"; then
+      already_running=$((already_running + 1))
+    fi
+  done
+  # Also check legacy single-worker PID
+  local legacy_wpf
+  legacy_wpf=$(pid_file "$name" "worker")
+  if is_running "$legacy_wpf"; then
+    echo "Worker already running (legacy PID $(cat "$legacy_wpf")). Stop first."
+    return 0
+  fi
+
+  if [[ $already_running -gt 0 ]]; then
+    echo "$already_running worker(s) already running. Stop first."
     return 0
   fi
 
@@ -100,13 +141,24 @@ with os.fdopen(fd, 'w') as f:
 os.rename(tmp, p)
 "
 
-  # Start Worker
-  nohup bash "$SCRIPTS_DIR/worker-loop.sh" "$name" \
-    >> "$inst_dir/logs/worker.log" 2>&1 &
-  echo $! > "$wpf"
-  disown
+  # Start N workers
+  for i in $(seq 1 "$num_workers"); do
+    local wpf
+    wpf=$(pid_file "$name" "worker.${i}")
+    nohup bash "$SCRIPTS_DIR/worker-loop.sh" "$name" "$i" \
+      >> "$inst_dir/logs/worker.${i}.log" 2>&1 &
+    echo $! > "$wpf"
+    disown
+  done
 
-  echo "Started worker for '$name' (PID $(cat "$wpf"))"
+  if [[ "$num_workers" -eq 1 ]]; then
+    echo "Started worker for '$name' (PID $(cat "$(pid_file "$name" "worker.1")"))"
+  else
+    echo "Started $num_workers workers for '$name'"
+    for i in $(seq 1 "$num_workers"); do
+      echo "  Worker $i: PID $(cat "$(pid_file "$name" "worker.${i}")")"
+    done
+  fi
 }
 
 cmd_stop() {
@@ -129,15 +181,22 @@ with os.fdopen(fd, 'w') as f:
 os.rename(tmp, p)
 "
 
-  # Kill worker
-  local wpf
-  wpf=$(pid_file "$name" "worker")
-  if is_running "$wpf"; then
-    kill "$(cat "$wpf")" 2>/dev/null || true
-    rm -f "$wpf"
-    echo "Stopped worker for '$name'"
+  # Kill all workers (numbered + legacy)
+  local killed=0
+  for pf in "$inst_dir"/logs/worker.*.pid "$inst_dir/logs/worker.pid"; do
+    if [[ -f "$pf" ]] && is_running "$pf"; then
+      kill "$(cat "$pf")" 2>/dev/null || true
+      rm -f "$pf"
+      killed=$((killed + 1))
+    elif [[ -f "$pf" ]]; then
+      rm -f "$pf"  # clean stale PID file
+    fi
+  done
+
+  if [[ $killed -gt 0 ]]; then
+    echo "Stopped $killed worker(s) for '$name'"
   else
-    echo "Worker not running for '$name'"
+    echo "No workers running for '$name'"
   fi
 }
 
@@ -153,13 +212,30 @@ cmd_status() {
 
   if [[ -n "$name" ]]; then
     ensure_instance "$name"
-    # Check worker process
-    local wpf
-    wpf=$(pid_file "$name" "worker")
-    if is_running "$wpf"; then
-      echo "Worker: running (PID $(cat "$wpf"))"
-    else
-      echo "Worker: stopped"
+    # Check worker processes
+    local running_workers=0
+    local total_workers=0
+    for pf in "$INSTANCES_DIR/$name"/logs/worker.*.pid; do
+      [[ -f "$pf" ]] || continue
+      total_workers=$((total_workers + 1))
+      local wid
+      wid=$(basename "$pf" .pid | sed 's/worker\.//')
+      if is_running "$pf"; then
+        running_workers=$((running_workers + 1))
+        echo "Worker $wid: running (PID $(cat "$pf"))"
+      else
+        echo "Worker $wid: stopped"
+      fi
+    done
+    # Legacy single-worker check
+    local legacy_wpf
+    legacy_wpf=$(pid_file "$name" "worker")
+    if [[ $total_workers -eq 0 ]]; then
+      if [[ -f "$legacy_wpf" ]] && is_running "$legacy_wpf"; then
+        echo "Worker: running (PID $(cat "$legacy_wpf"))"
+      else
+        echo "Worker: stopped"
+      fi
     fi
     # Check circuit breaker / completion
     if [[ -f "$INSTANCES_DIR/$name/logs/circuit-breaker.json" ]]; then
@@ -178,29 +254,48 @@ cmd_status() {
 
 cmd_logs() {
   local name="${1:-}"
-  [[ -n "$name" ]] || die "Usage: evo logs <name> [--follow] [--tail N]"
+  [[ -n "$name" ]] || die "Usage: evo logs <name> [--follow] [--tail N] [--worker ID]"
   ensure_instance "$name"
-
-  local log_file="$INSTANCES_DIR/$name/logs/worker.log"
-  [[ -f "$log_file" ]] || die "No log file found"
 
   shift
   local follow=false
   local tail_n=50
+  local worker_id=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --follow|-f) follow=true ;;
       --tail) tail_n="${2:-50}"; shift ;;
+      --worker|-w) worker_id="${2:-}"; shift ;;
       *) ;;
     esac
-    shift
+    shift 2>/dev/null || true
   done
 
-  if [[ "$follow" == "true" ]]; then
-    tail -f "$log_file"
+  local log_dir="$INSTANCES_DIR/$name/logs"
+
+  if [[ -n "$worker_id" ]]; then
+    # Specific worker log
+    local log_file="$log_dir/worker.${worker_id}.log"
+    [[ -f "$log_file" ]] || die "No log file for worker $worker_id"
+    if [[ "$follow" == "true" ]]; then
+      tail -f "$log_file"
+    else
+      tail -n "$tail_n" "$log_file"
+    fi
   else
-    tail -n "$tail_n" "$log_file"
+    # All worker logs (merge by time, or follow all)
+    local log_files=()
+    for f in "$log_dir"/worker.*.log "$log_dir/worker.log"; do
+      [[ -f "$f" ]] && log_files+=("$f")
+    done
+    [[ ${#log_files[@]} -gt 0 ]] || die "No log files found"
+
+    if [[ "$follow" == "true" ]]; then
+      tail -f "${log_files[@]}"
+    else
+      tail -n "$tail_n" "${log_files[@]}"
+    fi
   fi
 }
 
@@ -241,15 +336,23 @@ cmd_bootstrap() {
     active=$(python3 -c "import json; print(json.load(open('$state_file')).get('active', False))" 2>/dev/null || echo "False")
 
     if [[ "$active" == "True" ]]; then
-      local wpf
-      wpf=$(pid_file "$name" "worker")
-      if ! is_running "$wpf"; then
-        echo "Restoring worker for '$name'..."
-        nohup bash "$SCRIPTS_DIR/worker-loop.sh" "$name" \
-          >> "$dir/logs/worker.log" 2>&1 &
-        echo $! > "$wpf"
-        disown
-        count=$((count + 1))
+      local num_workers
+      num_workers=$(get_workers "$state_file")
+      local restored=0
+      for i in $(seq 1 "$num_workers"); do
+        local wpf
+        wpf=$(pid_file "$name" "worker.${i}")
+        if ! is_running "$wpf"; then
+          nohup bash "$SCRIPTS_DIR/worker-loop.sh" "$name" "$i" \
+            >> "$dir/logs/worker.${i}.log" 2>&1 &
+          echo $! > "$wpf"
+          disown
+          restored=$((restored + 1))
+        fi
+      done
+      if [[ $restored -gt 0 ]]; then
+        echo "Restored $restored worker(s) for '$name'"
+        count=$((count + restored))
       fi
     fi
   done
@@ -273,41 +376,44 @@ cmd_reset() {
 
   local inst_dir="$INSTANCES_DIR/$name"
 
-  # Check if worker is running — refuse unless --force or stale
-  local wpf
-  wpf=$(pid_file "$name" "worker")
-  if is_running "$wpf"; then
-    local pid
-    pid=$(cat "$wpf")
-    # Check how long the worker has been running (seconds) — macOS compatible
-    local elapsed
-    elapsed=$(python3 -c "
-import subprocess, re, time
-out = subprocess.check_output(['ps', '-o', 'lstart=', '-p', '$pid'], text=True).strip()
-# Parse 'Day Mon DD HH:MM:SS YYYY'
-import email.utils, calendar
+  # Check if any worker is running — refuse unless --force or stale
+  local any_running=false
+  for pf in "$inst_dir"/logs/worker.*.pid "$inst_dir/logs/worker.pid"; do
+    [[ -f "$pf" ]] || continue
+    if is_running "$pf"; then
+      local pid
+      pid=$(cat "$pf")
+      local elapsed
+      elapsed=$(python3 -c "
+import subprocess, time
 from datetime import datetime
+out = subprocess.check_output(['ps', '-o', 'lstart=', '-p', '$pid'], text=True).strip()
 dt = datetime.strptime(out, '%a %b %d %H:%M:%S %Y')
 print(int(time.time() - dt.timestamp()))
 " 2>/dev/null || echo "0")
-    local max_age=3600  # 1 hour — if older, treat as stale
+      local max_age=3600
 
-    if [[ "$force" == "true" ]]; then
-      echo "Force reset: killing worker (PID $pid, running ${elapsed}s)"
-      kill "$pid" 2>/dev/null || true
-      rm -f "$wpf"
-      sleep 1
-    elif [[ "$elapsed" -gt "$max_age" ]]; then
-      echo "Worker stale (PID $pid, running ${elapsed}s > ${max_age}s). Killing."
-      kill "$pid" 2>/dev/null || true
-      rm -f "$wpf"
-      sleep 1
+      if [[ "$force" == "true" ]]; then
+        echo "Force reset: killing worker (PID $pid, running ${elapsed}s)"
+        kill "$pid" 2>/dev/null || true
+        rm -f "$pf"
+      elif [[ "$elapsed" -gt "$max_age" ]]; then
+        echo "Worker stale (PID $pid, running ${elapsed}s > ${max_age}s). Killing."
+        kill "$pid" 2>/dev/null || true
+        rm -f "$pf"
+      else
+        any_running=true
+      fi
     else
-      echo "Worker is running (PID $pid, ${elapsed}s). Skipping reset."
-      echo "Use 'evo reset $name --force' to kill and reset."
-      return 0
+      rm -f "$pf"
     fi
+  done
+  if [[ "$any_running" == "true" ]]; then
+    echo "Worker(s) still running. Skipping reset."
+    echo "Use 'evo reset $name --force' to kill and reset."
+    return 0
   fi
+  sleep 1
 
   # Check for template to rebuild tasks
   local tmpl_dir="$FRAMEWORK_DIR/templates/$name"
@@ -388,10 +494,10 @@ Usage: evo <command> [args]
 
 Commands:
   create <name> "<desc>"   Create new instance
-  start <name>             Start Worker loop
-  stop <name>              Stop Worker loop
+  start <name> [-w N]      Start Worker loop (N=parallel workers, default from state.json)
+  stop <name>              Stop all Worker loops
   status [name]            Show status (all or one)
-  logs <name> [--follow]   View Worker logs
+  logs <name> [--follow] [--worker ID]   View Worker logs
   plan <name>              Manually trigger Planner
   reset <name>             Reset all tasks to pending (for recurring instances)
   integrate <name>         Phase 5: show integration routing for outputs
