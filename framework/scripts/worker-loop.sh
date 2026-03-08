@@ -220,6 +220,32 @@ print(', '.join(ofs))
   task_runner=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('runner','agent'))" 2>/dev/null)
 
   log "Executing task $task_id: $task_title"
+
+  # ─── Auto-split check ───
+  has_split=$(echo "$task_json" | python3 -c "
+import json,sys
+t=json.load(sys.stdin)
+print('yes' if t.get('auto_split') else 'no')
+" 2>/dev/null || echo "no")
+
+  if [[ "$has_split" == "yes" ]]; then
+    log "Task $task_id has auto_split, expanding..."
+    expand_exit=0
+    python3 "$SCRIPTS_DIR/expand_task.py" "$TASKS_FILE" "$task_id" "$INSTANCE_DIR" 2>>"$LOG_FILE" || expand_exit=$?
+    if [[ $expand_exit -eq 0 ]]; then
+      log "Task $task_id expanded into sub-tasks, continuing loop"
+      python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "$task_id" "expanded" '{}' 2>/dev/null || true
+      sleep 1
+      continue  # skip execution, next iteration picks sub-tasks
+    elif [[ $expand_exit -eq 1 ]]; then
+      log "Task $task_id: items within batch_size, executing normally"
+    else
+      log "Task $task_id: auto_split error (exit=$expand_exit)"
+      sleep $SLEEP_INTERVAL
+      continue
+    fi
+  fi
+
   python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "$task_id" "started" '{"model":"'"$(get_worker_model)"'"}' 2>/dev/null || true
 
   # ─── Build prompt: 3-layer context ───
