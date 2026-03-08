@@ -121,10 +121,16 @@ escalated = s.get('escalated', 0)
 print('yes' if total > 0 and done + escalated == total else 'no')
 " 2>/dev/null || echo "no")
     if [[ "$all_done" == "yes" && ! -f "$INSTANCE_DIR/logs/archived.flag" ]]; then
-      log "Trap: archiving completed instance before exit"
+      log "Trap: completed instance detected"
       echo "{\"event\":\"completed\",\"ts\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"instance\":\"$INSTANCE_NAME\"}" > "$INSTANCE_DIR/logs/completed.json"
       bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "all_complete" "" 2>/dev/null || true
-      bash "$SCRIPTS_DIR/archive-to-github.sh" "$INSTANCE_DIR" >> "$LOG_FILE" 2>&1 || true
+      # Skip archive for recurring instances (they get reset, not archived)
+      is_recurring=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('recurring', False))" 2>/dev/null || echo "False")
+      if [[ "$is_recurring" != "True" ]]; then
+        bash "$SCRIPTS_DIR/archive-to-github.sh" "$INSTANCE_DIR" >> "$LOG_FILE" 2>&1 || true
+      else
+        log "Recurring instance — skipping archive"
+      fi
       touch "$INSTANCE_DIR/logs/archived.flag"
     fi
   fi
@@ -567,7 +573,11 @@ print('yes' if total > 0 and done + escalated == total else 'no')
     echo "{\"event\":\"completed\",\"ts\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"instance\":\"$INSTANCE_NAME\"}" > "$INSTANCE_DIR/logs/completed.json"
     python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "worker" "auto_stop" '{"reason":"all_tasks_complete"}' 2>/dev/null || true
     bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "all_complete" "" &
-    bash "$SCRIPTS_DIR/archive-to-github.sh" "$INSTANCE_DIR" >> "$LOG_FILE" 2>&1 &
+    # Skip archive for recurring instances
+    is_recurring=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('recurring', False))" 2>/dev/null || echo "False")
+    if [[ "$is_recurring" != "True" ]]; then
+      bash "$SCRIPTS_DIR/archive-to-github.sh" "$INSTANCE_DIR" >> "$LOG_FILE" 2>&1 &
+    fi
   fi
 fi
 
