@@ -16,7 +16,7 @@
       "status": "in_progress",
       "attempts": 1,
       "runner": "agent",
-      "started_at": "2026-03-08T02:58:57.291454+00:00"
+      "started_at": "2026-03-08T03:42:27.792834+00:00"
     },
     {
       "id": "1.1",
@@ -142,7 +142,7 @@
       "id": "4.G",
       "phase": 4,
       "title": "Gate: 生成摘要 + 发 Discord",
-      "description": "读取所有 output/*.md 文件。生成一份**详细的** nightly evolution 报告。\n\n用 message tool 发送 Components V2 卡片到 Discord #main (target=1477311294368645365)：\n- container accentColor=#2ecc71（有问题用 #e67e22）\n- blocks 只用 type='text' 和 type='separator'\n- 每个 section 用一个 text block，用 separator 分隔\n\n卡片内容必须包含以下所有部分：\n\n### 1. 📁 Workspace 变更\n- 列出每个被修改/创建/删除的文件，说明做了什么改动\n- 例：`MEMORY.md` — 更新 Active Context 增加 3 条记录；`SHARED-FACTS.md` — 新增 timezone 相关 fact\n\n### 2. 🧠 Memory 蒸馏\n- 从哪些 daily notes 提取了什么内容\n- MEMORY.md 的哪些 section 被更新了，具体改了什么\n- SHARED-FACTS.md 新增/修改了哪些 fact\n\n### 3. 🔍 社区调研（每条都要有 1-2 句话说明是什么、为什么值得关注）\n- **OpenClaw 生态**: 列出每个发现（新 skill/版本/讨论），每条 1-2 句话描述\n- **AI/LLM 工具链**: 列出每个发现，每条 1-2 句话\n- **垂直领域**: 列出每个发现，每条 1-2 句话\n- ❌ 不要只放 keyword！要让 Caton 不用打开详细文件就能了解每条内容\n\n### 4. 🔧 健康检查\n- Cron 状态汇总（几个正常、几个异常）\n- Symlink 检查结果\n- 脚本验证结果\n\n### 5. 📦 Git\n- commit hash + 变更文件数 + push 状态\n\n末尾: <@803422039977099284> 模型：{model}\n\n发完后输出 summary.md（内容与卡片一致）。\n\n这是 Gate task：所有前置任务必须完成。",
+      "description": "⚠️ 必须发送 Discord V2 卡片，不允许以任何理由跳过（即使内容与上次相似）。\n\n读取所有 output/*.md 文件。生成一份**详细的** nightly evolution 报告。\n\n用 message tool 发送 Components V2 卡片到 Discord #main (target=1477311294368645365)：\n- container accentColor=#2ecc71（有问题用 #e67e22）\n- blocks 只用 type='text' 和 type='separator'\n- 每个 section 用一个 text block，用 separator 分隔\n\n卡片内容必须包含以下所有部分：\n\n### 1. 📁 Workspace 变更\n- 列出每个被修改/创建/删除的文件，说明做了什么改动\n- 例：`MEMORY.md` — 更新 Active Context 增加 3 条记录；`SHARED-FACTS.md` — 新增 timezone 相关 fact\n\n### 2. 🧠 Memory 蒸馏\n- 从哪些 daily notes 提取了什么内容\n- MEMORY.md 的哪些 section 被更新了，具体改了什么\n- SHARED-FACTS.md 新增/修改了哪些 fact\n\n### 3. 🔍 社区调研（每条都要有 1-2 句话说明是什么、为什么值得关注）\n- **OpenClaw 生态**: 列出每个发现（新 skill/版本/讨论），每条 1-2 句话描述\n- **AI/LLM 工具链**: 列出每个发现，每条 1-2 句话\n- **垂直领域**: 列出每个发现，每条 1-2 句话\n- ❌ 不要只放 keyword！要让 Caton 不用打开详细文件就能了解每条内容\n\n### 4. 🔧 健康检查\n- Cron 状态汇总（几个正常、几个异常）\n- Symlink 检查结果\n- 脚本验证结果\n\n### 5. 📦 Git\n- commit hash + 变更文件数 + push 状态\n\n末尾: <@803422039977099284> 模型：{model}\n\n发完后输出 summary.md（内容与卡片一致）。\n\n这是 Gate task：所有前置任务必须完成。",
       "depends_on": [
         "4.1",
         "3.1",

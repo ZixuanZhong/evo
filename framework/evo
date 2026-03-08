@@ -344,6 +344,13 @@ print(f'Reset {total} tasks to pending (in-place)')
   rm -f "$inst_dir/logs/archived.flag"
   rm -f "$inst_dir/logs/circuit-breaker.json"
 
+  # Clear output files from previous run (prevents workers from reusing stale data)
+  rm -f "$inst_dir/output/"*.md "$inst_dir/output/"*.json 2>/dev/null
+  rm -f "$inst_dir/knowledge/"*.md "$inst_dir/knowledge/"*.json 2>/dev/null
+  # Also clear root-level output files (some instances write here)
+  find "$inst_dir" -maxdepth 1 -name "*.md" ! -name "SPEC.md" ! -name "README.md" -delete 2>/dev/null
+  rm -f "$inst_dir/logs/task-log.jsonl" 2>/dev/null
+
   # Set active = false (start will set true)
   python3 -c "
 import json, tempfile, os
