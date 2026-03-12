@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # Planner: reads SPEC.md + tasks.json, generates/updates tasks via claude -p
+#
+# Architecture:
+#   - Planner instructions (fixed template) go into --system-prompt
+#   - SPEC + tasks are saved to a prompt file
+#   - A short user message tells claude to read the prompt file via Read tool
+#   - This keeps the stdin/argument small and avoids shell escaping issues
+#   - claude -p with Read/Write/Bash tools does the actual planning
 set -euo pipefail
 
 INSTANCE_DIR="$1"
@@ -11,9 +18,6 @@ if [[ ! -f "$SPEC_FILE" ]]; then
   echo "[Planner] ERROR: $SPEC_FILE not found" >&2
   exit 1
 fi
-
-SPEC_CONTENT=$(cat "$SPEC_FILE")
-TASKS_CONTENT=$(cat "$TASKS_FILE")
 
 # Read planner model from state.json (default: opus)
 PLANNER_MODEL="opus"
@@ -29,86 +33,77 @@ if [[ -f "$STATE_FILE" ]]; then
   WORKER_TIMEOUT="$wt"
 fi
 
-PROMPT="You are the Planner for an Evolution Loop project.
+# ─── Build planner prompt file ─────────────────────────
 
-Your job: read the SPEC and current tasks.json, then CREATE or UPDATE tasks in tasks.json.
+PROMPT_FILE="$INSTANCE_DIR/logs/.planner-prompt.md"
+cat > "$PROMPT_FILE" <<PROMPT_EOF
+# Planner Prompt
 
 ## SPEC.md
-$SPEC_CONTENT
+
+$(cat "$SPEC_FILE")
 
 ## Current tasks.json
-$TASKS_CONTENT
+
+$(cat "$TASKS_FILE")
 
 ## Instructions
 
 1. Read the SPEC carefully. Understand the phases, goals, and constraints.
 2. Look at the current tasks.json:
-   - If tasks is empty (plan_version=0): create ALL tasks for the first phase based on SPEC.
-   - If a gate task is 'done': plan the NEXT phase's tasks.
+   - If tasks is empty (plan_version=0): create ALL tasks for ALL phases based on SPEC.
+   - If a gate task is 'done': plan the NEXT phase's tasks (append to existing).
    - If tasks are 'escalated': redesign those tasks (break into smaller pieces, change approach).
 3. For each task, set:
    - id: phase.number (e.g. '1.1', '1.2', '1.G' for gates)
    - phase: phase name
    - title: short description
-   - description: detailed instructions (this is ALL the worker sees)
-   - spec_file: path to detailed spec if needed, or null
+   - description: detailed instructions (this is ALL the worker sees — must be self-contained)
    - status: 'pending'
-   - priority: 'high'/'medium'/'low'
    - depends_on: array of task IDs
    - output_files: array of expected output file paths
    - type: 'task' or 'gate'
-   - runner: 'agent', 'claude', 'codex', or 'gemini'
-     • 'agent' — OpenClaw agent with full tools (web_search, web_fetch, memory, plugins). Uses notac API tokens. Best for research, fetching URLs, checking latest info.
-     • 'claude' — Claude Code CLI (claude -p). Local tools only (Bash, Read, Write, Edit). Uses Claude subscription. Fast, no session overhead. Good for code generation, writing docs, gates.
-     • 'codex' — Codex CLI (codex exec). Local tools + optional web search. Uses OpenAI/Codex subscription. Good for code generation, refactoring, code review.
-     • 'gemini' — Gemini CLI (gemini -p). Local tools. Uses Gemini subscription. Good for code generation, analysis, writing.
-     Prefer 'claude'/'codex'/'gemini' over 'agent' when the task doesn't need web access or OpenClaw plugins — they use subscription plans instead of API tokens.
+   - runner: 'codex', 'claude', 'gemini', or 'agent'
+     • codex — Codex CLI. Uses OpenAI subscription. Good for code generation.
+     • claude — Claude Code CLI. Uses Claude subscription. Good for code, docs, gates.
+     • gemini — Gemini CLI. Uses Gemini subscription. Good for analysis.
+     • agent — OpenClaw agent with web tools. Uses API tokens. For research only.
+     Prefer codex/claude/gemini over agent (subscription vs API tokens).
    - started_at: null, completed_at: null, error: null, attempts: 0
 4. Update plan_version (increment by 1).
-5. Update the phase field to the current phase name.
+5. Update the phase and summary fields.
 6. Set planner_trigger to false.
-7. Update the summary counts.
-8. Write the updated tasks.json to: $TASKS_FILE
+7. Write the updated tasks.json to: $TASKS_FILE
 
 IMPORTANT:
-- Tasks must be ATOMIC: 1 task = 1 output file.
+- Tasks must be ATOMIC: 1 task = 1 clear deliverable.
 - Gate conditions must use >= not ==.
-- Worker runs via OpenClaw agent with FULL tools: web_search, web_fetch, exec, Read, Write, Edit.
-- Worker CAN access the internet via web_search/web_fetch — design research tasks accordingly.
-- Each task description must be self-contained — worker has no memory of other tasks.
-- Include the full file path in output_files (relative to instance dir).
-- Worker timeout is ${WORKER_TIMEOUT}s. If any task is likely to exceed ~70% of this timeout, SPLIT it into smaller tasks (e.g., 4.1a/4.1b, 5.1a/5.1b).
-- If a task repeatedly fails due to timeout or oversized scope, re-plan by decomposing it and rewiring dependencies.
+- Each task description must be SELF-CONTAINED — worker has no memory of other tasks.
+- Worker timeout is ${WORKER_TIMEOUT}s. Split large tasks to stay under ~70%.
+- Include full file paths in output_files.
+PROMPT_EOF
 
-Write the updated tasks.json now. Also create any phase spec files in specs/ if needed."
+# ─── Build system prompt (short, fixed) ────────────────
 
-# Read planner agent from state.json (default: evo)
-PLANNER_AGENT="evo"
-if [[ -f "$STATE_FILE" ]]; then
-  agent=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('worker_agent','evo'))" 2>/dev/null || echo "evo")
-  PLANNER_AGENT="$agent"
-fi
+SYSTEM_PROMPT="You are the Planner for an Evolution Loop project. Your job is to read a prompt file containing the SPEC and current tasks, then create/update tasks.json. Use the Read tool to read the prompt file, then use the Write tool or Bash tool to update tasks.json. Be precise and thorough."
 
-echo "[Planner] Running planner for $(basename "$INSTANCE_DIR") via openclaw agent --agent $PLANNER_AGENT ($PLANNER_MODEL)..." >&2
+# ─── Run claude -p ─────────────────────────────────────
 
-# Write prompt to temp file to avoid command-line length limits
-PLANNER_SESSION_ID="evo-planner-$(basename "$INSTANCE_DIR")-$(date +%s)"
-PROMPT_FILE="$INSTANCE_DIR/logs/.planner-prompt.md"
-echo "$PROMPT" > "$PROMPT_FILE"
+echo "[Planner] Running planner for $(basename "$INSTANCE_DIR") via claude -p (model: $PLANNER_MODEL)..." >&2
 
 (
   cd "$INSTANCE_DIR"
-  openclaw agent \
-    --agent "$PLANNER_AGENT" \
-    --session-id "$PLANNER_SESSION_ID" \
-    --message "You are the Planner for an Evolution Loop. Read the prompt file and execute it: $PROMPT_FILE" \
-    --timeout 300 \
-    2>&1
-) | tail -5 >&2
+  echo "Read the planner prompt file at $PROMPT_FILE and follow its instructions to create/update tasks.json." | \
+    claude -p \
+      --model "$PLANNER_MODEL" \
+      --system-prompt "$SYSTEM_PROMPT" \
+      --allowedTools "Read,Write,Edit,Bash" \
+      --add-dir "$INSTANCE_DIR" \
+      2>&1
+) | tail -10 >&2
 
-rm -f "$PROMPT_FILE" 2>/dev/null
+# ─── Post-run: reset planner_trigger ───────────────────
 
-# Reset planner_trigger
 python3 -c "
 import json, tempfile, os
 p = '$TASKS_FILE'

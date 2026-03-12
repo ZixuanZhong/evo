@@ -5,14 +5,14 @@ A task orchestration framework that breaks complex projects into phased, depende
 ## How It Works
 
 ```
-SPEC.md → Planner → tasks.json → Worker Loop → Output Files
-              ↑                        ↓
-              └─── Gate Pass ──────────┘
+SPEC.md → Parser/Planner → tasks.json → Worker Loop → Output Files
+                ↑                            ↓
+                └────── Gate Pass ───────────┘
 ```
 
 1. **You** write a `SPEC.md` defining phases, tasks, and gates
-2. **Planner** (AI) converts the spec into structured `tasks.json`
-3. **Worker Loop** picks tasks by dependency order, executes them via OpenClaw agent or Claude CLI
+2. **Parser** deterministically converts structured `## Tasks` section into `tasks.json` — no LLM, instant. Falls back to AI planner for unstructured specs.
+3. **Worker Loop** picks tasks by dependency order, executes them via configurable runners (codex, claude, gemini, or OpenClaw agent)
 4. **Gates** validate phase completion before unlocking the next phase
 5. **Circuit breaker** pauses after consecutive failures; **auto-escalation** after repeated task failures
 
@@ -53,6 +53,26 @@ cp ~/.openclaw/evo/framework/.env.example ~/.openclaw/evo/.env
 # Edit .env with your settings
 ```
 
+### Install the OpenClaw Agent Skill
+
+Evo ships with an OpenClaw agent skill at `framework/skills/evo/`. To let your agent discover and use evo commands in conversation, symlink it into the agent's workspace:
+
+```bash
+# Symlink the skill into your OpenClaw workspace skills directory
+ln -sf ~/.openclaw/evo/framework/skills/evo \
+       "$(openclaw config get workspace 2>/dev/null || echo ~/.openclaw/workspace)/skills/evo"
+```
+
+Or if you know your workspace path:
+
+```bash
+ln -sf ~/.openclaw/evo/framework/skills/evo ~/.openclaw/workspace/skills/evo
+```
+
+After symlinking, the agent will automatically discover the `evo` skill and can create instances, run plans, start workers, and monitor progress through natural conversation.
+
+> **For agents reading this README**: to install the skill programmatically, run the symlink command above. The skill source lives in this repo and stays in sync — no manual updates needed.
+
 ## Quick Start
 
 ### 1. Create an Instance
@@ -80,7 +100,7 @@ This creates `~/.openclaw/evo/instances/my-research/` with:
 >
 > This is faster, produces better-structured SPECs, and catches missing dependencies early.
 
-You can also write it manually. Edit `~/.openclaw/evo/instances/my-research/SPEC.md`:
+Edit `~/.openclaw/evo/instances/my-research/SPEC.md`. Use the **structured task format** (recommended — deterministic, instant parsing, no LLM cost):
 
 ```markdown
 # my-research — SPEC
@@ -93,24 +113,48 @@ Researching the feasibility of using LLMs for code analysis.
 2. Design a prototype architecture
 3. Estimate costs and timelines
 
-## Phase 0: Knowledge Building
-| ID  | Title              | Depends On | Output                  |
-|-----|--------------------|------------|-------------------------|
-| 0.1 | Survey LLM tools   | —          | `knowledge/llm-tools.md`|
-| 0.2 | Survey code analyzers | —       | `knowledge/analyzers.md`|
-| 0.G | Gate: Phase 0 done | 0.1, 0.2   | —                       |
+## Tasks
 
-## Phase 1: Design
-| ID  | Title              | Depends On | Output                  |
-|-----|--------------------|------------|-------------------------|
-| 1.1 | Architecture design| 0.G        | `output/architecture.md`|
-| 1.G | Gate: Phase 1 done | 1.1        | —                       |
+### 0.1 Survey LLM tools [agent]
+> depends: -
+> output: knowledge/llm-tools.md
+
+Survey existing LLM-based code analysis tools. Cover:
+- GitHub Copilot, Cursor, Cody, etc.
+- Research papers on LLM + static analysis
+Write findings to knowledge/llm-tools.md.
+
+### 0.2 Survey code analyzers [agent]
+> depends: -
+> output: knowledge/analyzers.md
+
+Survey traditional code analysis tools (Semgrep, CodeQL, tree-sitter).
+Write findings to knowledge/analyzers.md.
+
+### 0.G Gate: Phase 0 done [claude]
+> depends: 0.1, 0.2
+
+Verify knowledge/llm-tools.md and knowledge/analyzers.md exist and have >500 bytes each.
+
+### 1.1 Architecture design [claude]
+> depends: 0.G
+> output: output/architecture.md
+
+Read knowledge/*.md files. Design a prototype architecture.
+Write to output/architecture.md.
+
+### 1.G Gate: Phase 1 done [claude]
+> depends: 1.1
+
+Verify output/architecture.md exists and is well-structured.
 ```
+
+See [framework/docs/SPEC-FORMAT.md](framework/docs/SPEC-FORMAT.md) for the full format specification.
 
 ### 3. Plan & Start
 
 ```bash
-# Generate tasks from SPEC (runs AI planner)
+# Parse SPEC.md → tasks.json (instant, deterministic — no LLM)
 evo plan my-research
 
 # Start the worker loop
@@ -255,7 +299,7 @@ Each task has a `runner` field:
 
 - **`agent`** — Runs via `openclaw agent`. Full tools: web_search, web_fetch, plugins. Uses API tokens. Best for research tasks needing internet or plugins.
 - **`claude`** — Runs via `claude -p`. Local tools (Bash, Read, Write, Edit). Uses Claude subscription. Faster, cheaper. Good for code generation, gates.
-- **`codex`** — Runs via `codex exec`. Local tools + optional web search (auto-enabled for research tasks). Uses OpenAI/Codex subscription. Full-auto, full disk access. Good for code generation, refactoring.
+- **`codex`** — Runs via `codex exec`. Local tools + optional web search (auto-enabled for research tasks). Uses OpenAI/Codex subscription. Full-auto, full disk access. Good for code generation, refactoring. Note: the `--model` flag is only passed for recognized OpenAI model names (e.g. `o3`, `o4-mini`, `gpt-4.1`); subscription aliases like `codex` omit it to avoid auth errors.
 - **`gemini`** — Runs via `gemini -p`. Local tools in sandbox. Uses Gemini subscription. Yolo (auto-approve) mode. Good for code generation, analysis, writing.
 
 > **Cost tip**: Prefer `claude`/`codex`/`gemini` over `agent` when the task doesn't need web access or OpenClaw plugins — they use subscription plans instead of API tokens.
@@ -270,9 +314,12 @@ Each task has a `runner` field:
 │   ├── evo                       # CLI entry point
 │   ├── CLAUDE.md                 # Worker context instructions
 │   ├── .env.example              # Config template
+│   ├── docs/
+│   │   └── SPEC-FORMAT.md        # Structured SPEC.md task format spec
 │   ├── scripts/
 │   │   ├── worker-loop.sh        # Main execution loop
-│   │   ├── planner.sh            # AI planner
+│   │   ├── planner.sh            # AI planner (with deterministic fallback)
+│   │   ├── spec2tasks.py         # Deterministic SPEC → tasks.json parser
 │   │   ├── pick_next_task.py     # Task selection + anti-stuck
 │   │   ├── expand_task.py        # Auto-split task expansion
 │   │   ├── check_budget.py       # Daily budget enforcement
@@ -282,6 +329,9 @@ Each task has a `runner` field:
 │   │   ├── integrate.sh          # Output routing suggestions
 │   │   ├── notify-discord.sh     # Discord notifications
 │   │   └── archive-to-github.sh  # GitHub archiving
+│   ├── skills/
+│   │   └── evo/
+│   │       └── SKILL.md          # OpenClaw agent skill (auto-discovered)
 │   └── templates/
 │       ├── SPEC.md.template
 │       ├── tasks.json.template
@@ -395,6 +445,23 @@ Add `auto_split` to any task in `tasks.json`:
 ### Example
 
 See [examples/batch-processing/](examples/batch-processing/) — a project that scans files, auto-splits processing into batches, then summarizes results.
+
+## Deterministic Planner
+
+`evo plan` now supports two modes:
+
+1. **Deterministic parser** (default, recommended): If your `SPEC.md` contains a `## Tasks` section using the [structured format](framework/docs/SPEC-FORMAT.md), `spec2tasks.py` parses it directly into `tasks.json`. Instant, zero LLM cost, fully reproducible.
+
+2. **AI planner** (fallback): If no `## Tasks` section is found, falls back to LLM-based planning. Slower (30s–5min) and costs tokens, but handles unstructured specs.
+
+```bash
+# Deterministic (instant) — requires structured ## Tasks in SPEC.md
+evo plan my-instance
+
+# Validate format without writing tasks.json
+python3 ~/.openclaw/evo/framework/scripts/spec2tasks.py \
+  ~/.openclaw/evo/instances/my-instance/SPEC.md --validate
+```
 
 ## Anti-Stuck Mechanisms
 

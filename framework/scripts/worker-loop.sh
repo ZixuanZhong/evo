@@ -57,10 +57,12 @@ d = json.load(open(p))
 for t in d['tasks']:
     if t['id'] == '$task_id' and t['status'] == 'in_progress':
         if $exit_code == 0:
-            # Check if output files exist (support both output_files array and legacy output_file string)
+            # Check if output files exist (support output_files, output_file, and output keys)
             out_files = t.get('output_files', [])
             if not out_files and t.get('output_file'):
                 out_files = [t['output_file']]
+            if not out_files and t.get('output'):
+                out_files = [t['output']] if isinstance(t['output'], str) else t['output']
             all_exist = True
             for of in out_files:
                 if of and not os.path.exists(os.path.join('$INSTANCE_DIR', of)):
@@ -216,6 +218,9 @@ t=json.load(sys.stdin)
 ofs=t.get('output_files', [])
 if not ofs and t.get('output_file'):
     ofs=[t['output_file']]
+if not ofs and t.get('output'):
+    o=t['output']
+    ofs=[o] if isinstance(o,str) else o
 print(', '.join(ofs))
 " 2>/dev/null)
   task_runner=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('runner','agent'))" 2>/dev/null)
@@ -296,6 +301,9 @@ for dep_id in deps:
         dep_ofs = dep.get('output_files', [])
         if not dep_ofs and dep.get('output_file'):
             dep_ofs = [dep['output_file']]
+        if not dep_ofs and dep.get('output'):
+            o = dep['output']
+            dep_ofs = [o] if isinstance(o, str) else o
         for of in dep_ofs:
             fp = os.path.join('$INSTANCE_DIR', of)
             if os.path.isfile(fp) and os.path.getsize(fp) < 30000:
@@ -391,21 +399,27 @@ Working directory: $INSTANCE_DIR"
     codex)
       # ─── codex exec: local tools + optional web, uses Codex/OpenAI subscription ───
       # Model override: state.json worker_model applies (e.g. o3, o4-mini, codex-mini)
+      # ChatGPT subscription uses default model; only pass --model for explicit OpenAI model names
       CODEX_MODEL="${WORKER_MODEL}"
-      # Map common aliases to codex-compatible model names
+      CODEX_MODEL_FLAG=""
       case "$CODEX_MODEL" in
-        sonnet|opus|haiku) CODEX_MODEL="o4-mini" ;;  # default fallback for non-OpenAI aliases
+        codex|sonnet|opus|haiku) CODEX_MODEL_FLAG="" ;;  # use codex default (ChatGPT subscription)
+        o3|o4-mini|gpt-4o|gpt-4.1*) CODEX_MODEL_FLAG="--model $CODEX_MODEL" ;;  # explicit OpenAI model
+        *) CODEX_MODEL_FLAG="" ;;  # unknown → default
       esac
       CODEX_EXTRA_FLAGS=""
       # Enable web search if task is agent-like (research)
       if echo "$task_json" | python3 -c "import json,sys; t=json.load(sys.stdin); sys.exit(0 if 'research' in t.get('title','').lower() or 'research' in t.get('description','').lower() else 1)" 2>/dev/null; then
         CODEX_EXTRA_FLAGS="--web-search"
       fi
-      log "Executing via codex exec (runner=codex), model: $CODEX_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
+      # Allow per-instance workdir override (e.g. for writing outside evo output/)
+      CODEX_WORKDIR=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('codex_workdir',''))" 2>/dev/null || true)
+      CODEX_WORKDIR="${CODEX_WORKDIR:-$INSTANCE_DIR}"
+      log "Executing via codex exec (runner=codex), model: ${CODEX_MODEL} (flag: ${CODEX_MODEL_FLAG:-default}), workdir: ${CODEX_WORKDIR}, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
       (
-        cd "$INSTANCE_DIR"
+        cd "$CODEX_WORKDIR"
         codex exec \
-          --model "$CODEX_MODEL" \
+          $CODEX_MODEL_FLAG \
           --full-auto \
           --sandbox danger-full-access \
           $CODEX_EXTRA_FLAGS \
@@ -554,6 +568,36 @@ for t in d['tasks']:
   [[ "$final_status" == "failed" ]] && log_event="failed"
   [[ "$final_status" == "escalated" ]] && log_event="escalated"
   python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "$task_id" "$log_event" '{"exit_code":'"$worker_exit"'}' 2>/dev/null || true
+
+  # ─── Rate limit auto-fallback: codex → claude ───
+  if [[ "$final_status" == "failed" && "$task_runner" == "codex" ]]; then
+    # Check last ~50 lines of log for rate limit indicators
+    if tail -50 "$LOG_FILE" 2>/dev/null | grep -qiE "rate.?limit|usage.?limit|quota|too many requests|5.hour|capacity|429"; then
+      log "[RATE-LIMIT] Codex rate limit detected. Falling back to claude runner for remaining tasks."
+      # Switch all pending codex tasks to claude
+      python3 -c "
+import json, tempfile, os
+p = '$TASKS_FILE'
+d = json.load(open(p))
+switched = 0
+for t in d['tasks']:
+    if t.get('runner') == 'codex' and t['status'] in ('pending', 'failed'):
+        t['runner'] = 'claude'
+        if t['status'] == 'failed':
+            t['status'] = 'pending'
+            t['attempts'] = 0
+            t.pop('error', None)
+        switched += 1
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), suffix='.tmp')
+with os.fdopen(fd, 'w') as f:
+    json.dump(d, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+os.rename(tmp, p)
+print(f'Switched {switched} tasks from codex to claude')
+" 2>>"$LOG_FILE" || true
+      bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "rate_limit_fallback" "codex→claude" &
+    fi
+  fi
 
   # Circuit breaker: track consecutive failures
   if [[ "$final_status" == "failed" || "$final_status" == "escalated" ]]; then
