@@ -304,7 +304,10 @@ cmd_plan() {
   [[ -n "$name" ]] || die "Usage: evo plan <name>"
   ensure_instance "$name"
 
-  bash "$SCRIPTS_DIR/planner.sh" "$INSTANCES_DIR/$name"
+  local inst_dir="$INSTANCES_DIR/$name"
+  local spec_file="$inst_dir/SPEC.md"
+
+  python3 "$SCRIPTS_DIR/spec2tasks.py" "$inst_dir"
 }
 
 cmd_destroy() {
