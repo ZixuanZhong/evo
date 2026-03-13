@@ -36,7 +36,22 @@ check_budget() {
 }
 
 get_worker_model() {
+  # Returns global worker_model; use get_runner_model for runner-specific overrides
   python3 -c "import json; print(json.load(open('$STATE_FILE')).get('worker_model','sonnet'))" 2>/dev/null || echo "sonnet"
+}
+
+get_runner_model() {
+  # Runner-specific model: claude_model > worker_model for claude, codex_model > worker_model for codex, etc.
+  local runner="$1"
+  python3 -c "
+import json
+s = json.load(open('$STATE_FILE'))
+runner = '${runner}'
+runner_key = runner + '_model'
+# Prefer runner-specific model, fall back to worker_model, then 'sonnet'
+model = s.get(runner_key) or s.get('worker_model', 'sonnet')
+print(model)
+" 2>/dev/null || echo "sonnet"
 }
 
 get_worker_agent() {
@@ -56,27 +71,40 @@ p = '$TASKS_FILE'
 d = json.load(open(p))
 for t in d['tasks']:
     if t['id'] == '$task_id' and t['status'] == 'in_progress':
-        if $exit_code == 0:
-            # Check if output files exist (support output_files, output_file, and output keys)
-            out_files = t.get('output_files', [])
-            if not out_files and t.get('output_file'):
-                out_files = [t['output_file']]
-            if not out_files and t.get('output'):
-                out_files = [t['output']] if isinstance(t['output'], str) else t['output']
-            all_exist = True
-            for of in out_files:
-                if of and not os.path.exists(os.path.join('$INSTANCE_DIR', of)):
+        # Check if output files exist (support output_files, output_file, and output keys)
+        out_files = t.get('output_files', [])
+        if not out_files and t.get('output_file'):
+            out_files = [t['output_file']]
+        if not out_files and t.get('output'):
+            out_files = [t['output']] if isinstance(t['output'], str) else t['output']
+        all_exist = True
+        workdir = d.get('codex_workdir', '') or ''
+        try:
+            import json as _j
+            with open(os.path.join('$INSTANCE_DIR', 'state.json')) as _sf:
+                _st = _j.load(_sf)
+                workdir = _st.get('codex_workdir', '') or workdir
+        except Exception:
+            pass
+        for of in out_files:
+            if of and not os.path.exists(os.path.join('$INSTANCE_DIR', of)):
+                # Also check codex_workdir (output may be relative to project dir)
+                if not workdir or not os.path.exists(os.path.join(workdir, of)):
                     all_exist = False
                     break
-            if all_exist or t.get('type') == 'gate':
-                t['status'] = 'done'
-                t['completed_at'] = datetime.now(timezone.utc).isoformat()
-                # If gate done, trigger planner for next phase
-                if t.get('type') == 'gate':
-                    d['planner_trigger'] = True
-            else:
-                t['status'] = 'failed'
-                t['error'] = 'Output files not found after execution'
+        if all_exist or t.get('type') == 'gate':
+            # Output files present (or gate task) → mark done regardless of exit code
+            # Handles: exit 0 (normal), exit 143 (SIGTERM from watchdog after work completed)
+            t['status'] = 'done'
+            t['completed_at'] = datetime.now(timezone.utc).isoformat()
+            if $exit_code != 0:
+                print(f'[verify] Task $task_id: exit code $exit_code but output files exist → marking done')
+            # If gate done, trigger planner for next phase
+            if t.get('type') == 'gate':
+                d['planner_trigger'] = True
+        elif $exit_code == 0:
+            t['status'] = 'failed'
+            t['error'] = 'Output files not found after execution'
         else:
             t['status'] = 'failed'
             t['error'] = f'Worker exited with code $exit_code'
@@ -348,21 +376,33 @@ $task_desc
 ## Rules
 
 1. Create the output file(s) listed above. All paths relative to: $INSTANCE_DIR
-2. After completing the work, mark the task as done:
+2. For research tasks: USE web_search to find real papers, products, benchmarks. Do NOT fabricate citations.
+3. Write knowledge docs in Chinese (通俗易懂), code in English comments.
+"
+
+  # Runner-specific rules: codex/gemini can't write outside workdir, so skip mark-task instructions
+  if [[ "$task_runner" == "codex" || "$task_runner" == "gemini" ]]; then
+    PROMPT="$PROMPT
+4. When done, simply exit. The orchestrator will detect your output files and mark the task automatically.
+5. ⛔ Do NOT try to write to $INSTANCE_DIR — you may not have access. Just create the output files in your working directory.
+
+Working directory (for output files): codex_workdir or \$INSTANCE_DIR (orchestrator checks both)"
+  else
+    PROMPT="$PROMPT
+4. After completing the work, mark the task as done:
    \`\`\`bash
    bash $SCRIPTS_DIR/mark-task.sh $INSTANCE_DIR $task_id done
    \`\`\`
-3. If you cannot complete the task, mark it as failed:
+5. If you cannot complete the task, mark it as failed:
    \`\`\`bash
    bash $SCRIPTS_DIR/mark-task.sh $INSTANCE_DIR $task_id failed \"reason here\"
    \`\`\`
-4. ⛔ **DO NOT edit tasks.json directly.** Only use mark-task.sh. Any direct edits will be reverted.
-5. For research tasks: USE web_search to find real papers, products, benchmarks. Do NOT fabricate citations.
-6. Write knowledge docs in Chinese (通俗易懂), code in English comments.
+6. ⛔ **DO NOT edit tasks.json directly.** Only use mark-task.sh. Any direct edits will be reverted.
 
 Working directory: $INSTANCE_DIR"
+  fi
 
-  WORKER_MODEL=$(get_worker_model)
+  WORKER_MODEL=$(get_runner_model "$task_runner")
   WORKER_AGENT=$(get_worker_agent)
   WORKER_TIMEOUT=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('worker_timeout', 300))" 2>/dev/null || echo "300")
 

@@ -285,10 +285,14 @@ Set these in `~/.openclaw/evo/.env` (auto-loaded by CLI).
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `worker_model` | `sonnet` | Model for worker tasks |
+| `worker_model` | `sonnet` | Default model for all runners (fallback) |
+| `claude_model` | _(none)_ | Model override for `claude` runner |
+| `codex_model` | _(none)_ | Model override for `codex` runner |
+| `gemini_model` | _(none)_ | Model override for `gemini` runner |
 | `planner_model` | `opus` | Model for planner |
 | `worker_agent` | `evo` | OpenClaw agent ID for `agent` runner |
 | `worker_timeout` | `600` | Timeout per task (seconds) |
+| `codex_workdir` | _(none)_ | Working directory for `codex` runner (project root) |
 | `workers` | `1` | Number of parallel worker loops |
 | `budget_daily` | `50` | Max tasks per day |
 | `recurring` | `false` | Whether instance supports `evo reset` from template |
@@ -303,6 +307,25 @@ Each task has a `runner` field:
 - **`gemini`** — Runs via `gemini -p`. Local tools in sandbox. Uses Gemini subscription. Yolo (auto-approve) mode. Good for code generation, analysis, writing.
 
 > **Cost tip**: Prefer `claude`/`codex`/`gemini` over `agent` when the task doesn't need web access or OpenClaw plugins — they use subscription plans instead of API tokens.
+
+#### Runner-Specific Model Override
+
+Each runner can have its own model via `{runner}_model` in `state.json`:
+
+```json
+{
+  "worker_model": "sonnet",
+  "claude_model": "opus",
+  "codex_model": "gpt-5.4",
+  "gemini_model": "gemini-2.5-pro"
+}
+```
+
+The resolution order is: `{runner}_model` → `worker_model` → `"sonnet"`. This prevents model name conflicts (e.g., Claude CLI doesn't recognize `codex` as a model name).
+
+#### Runner-Aware Task Completion
+
+Sandboxed runners (`codex`, `gemini`) cannot write back to the evo instance directory, so they don't receive `mark-task.sh` instructions. Instead, the worker loop's `verify_task` automatically detects completion by checking whether the task's output files exist — regardless of the worker's exit code. This handles edge cases like watchdog timeouts (SIGTERM/exit 143) where the work completed but the process was killed before status could be written back.
 
 ## Directory Structure
 
