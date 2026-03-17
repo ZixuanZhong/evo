@@ -152,9 +152,8 @@ escalated = s.get('escalated', 0)
 print('yes' if total > 0 and done + escalated == total else 'no')
 " 2>/dev/null || echo "no")
     if [[ "$all_done" == "yes" && ! -f "$INSTANCE_DIR/logs/archived.flag" ]]; then
-      log "Trap: completed instance detected"
+      log "Trap: completed instance detected (notification handled by main loop)"
       echo "{\"event\":\"completed\",\"ts\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"instance\":\"$INSTANCE_NAME\"}" > "$INSTANCE_DIR/logs/completed.json"
-      bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "all_complete" "" 2>/dev/null || true
       # Skip archive for recurring instances (they get reset, not archived)
       is_recurring=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('recurring', False))" 2>/dev/null || echo "False")
       if [[ "$is_recurring" != "True" ]]; then
@@ -659,11 +658,8 @@ print(f'Switched {switched} tasks from codex to claude')
   log "Task $task_id finished (status: $final_status)"
 
   # ─── Discord notification hook ───
-  # Notify on: gate passed, circuit breaker (all_complete handled below)
-  if [[ "$final_status" == "done" && "$task_id" == *".G" ]]; then
-    task_title=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('title',''))" 2>/dev/null || echo "$task_id")
-    bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "gate_passed" "$task_title" &
-  fi
+  # Gate tasks send their own Discord card via message tool, so skip notify-discord.sh for gates.
+  # Only notify on circuit breaker (handled above). all_complete handled below.
 
   sleep $SLEEP_INTERVAL
 done
