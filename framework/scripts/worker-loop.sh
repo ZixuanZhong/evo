@@ -154,6 +154,7 @@ print('yes' if total > 0 and done + escalated == total else 'no')
     if [[ "$all_done" == "yes" && ! -f "$INSTANCE_DIR/logs/archived.flag" ]]; then
       log "Trap: completed instance detected (notification handled by main loop)"
       echo "{\"event\":\"completed\",\"ts\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"instance\":\"$INSTANCE_NAME\"}" > "$INSTANCE_DIR/logs/completed.json"
+      bash "$SCRIPTS_DIR/notify.sh" "$INSTANCE_DIR" "all_complete" "" 2>/dev/null || true
       # Skip archive for recurring instances (they get reset, not archived)
       is_recurring=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('recurring', False))" 2>/dev/null || echo "False")
       if [[ "$is_recurring" != "True" ]]; then
@@ -489,14 +490,26 @@ Working directory: $INSTANCE_DIR"
 
     agent|*)
       # ─── openclaw agent: full tools (web_search, web_fetch, memory, plugins) — uses notac tokens ───
+      # IMPORTANT: agent runner uses a per-agent mutex lock to prevent session file lock contention.
+      # Multiple workers running agent tasks concurrently will deadlock on the session file.
+      # The flock ensures only one agent task runs at a time; others queue and wait.
+      AGENT_LOCK_FILE="$EVO_ROOT/.locks/agent-${WORKER_AGENT}.lock"
+      mkdir -p "$(dirname "$AGENT_LOCK_FILE")"
       log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
+      log "[agent-lock] Acquiring exclusive lock: $AGENT_LOCK_FILE"
       SESSION_ID="evo-${INSTANCE_NAME}-${task_id}-$(date +%s)"
-      openclaw agent \
-        --agent "$WORKER_AGENT" \
-        --session-id "$SESSION_ID" \
-        --message "You are a research Worker in an Evolution Loop. Read the task prompt file and execute it: $PROMPT_FILE" \
-        --timeout "$WORKER_TIMEOUT" \
-        2>>"$LOG_FILE" >> "$LOG_FILE" &
+      (
+        flock -w "$((WORKER_TIMEOUT + 60))" 200 || { echo "[agent-lock] Failed to acquire lock after timeout" >> "$LOG_FILE"; exit 1; }
+        log "[agent-lock] Lock acquired, starting agent"
+        # Clean stale session locks inside the critical section
+        find "$HOME/.openclaw/agents/${WORKER_AGENT}/sessions/" -name "*.lock" -delete 2>/dev/null || true
+        openclaw agent \
+          --agent "$WORKER_AGENT" \
+          --session-id "$SESSION_ID" \
+          --message "You are a research Worker in an Evolution Loop. Read the task prompt file and execute it: $PROMPT_FILE" \
+          --timeout "$WORKER_TIMEOUT" \
+          2>>"$LOG_FILE" >> "$LOG_FILE"
+      ) 200>"$AGENT_LOCK_FILE" &
       WORKER_PID=$!
       ;;
   esac
@@ -634,7 +647,7 @@ with os.fdopen(fd, 'w') as f:
 os.rename(tmp, p)
 print(f'Switched {switched} tasks from codex to claude')
 " 2>>"$LOG_FILE" || true
-      bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "rate_limit_fallback" "codex→claude" &
+      bash "$SCRIPTS_DIR/notify.sh" "$INSTANCE_DIR" "rate_limit_fallback" "codex→claude" &
     fi
   fi
 
@@ -647,7 +660,7 @@ print(f'Switched {switched} tasks from codex to claude')
       python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "circuit_breaker" "circuit_breaker" '{"consecutive_failures":'"$consecutive_failures"'}' 2>/dev/null || true
       # Write marker for reporter/inspector to pick up
       echo "{\"event\":\"circuit_breaker\",\"ts\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"failures\":$consecutive_failures}" > "$INSTANCE_DIR/logs/circuit-breaker.json"
-      bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "circuit_breaker" "$consecutive_failures" &
+      bash "$SCRIPTS_DIR/notify.sh" "$INSTANCE_DIR" "circuit_breaker" "$consecutive_failures" &
       sleep 3600  # pause 1 hour
       consecutive_failures=0  # reset after pause
     fi
@@ -657,9 +670,12 @@ print(f'Switched {switched} tasks from codex to claude')
 
   log "Task $task_id finished (status: $final_status)"
 
-  # ─── Discord notification hook ───
-  # Gate tasks send their own Discord card via message tool, so skip notify-discord.sh for gates.
-  # Only notify on circuit breaker (handled above). all_complete handled below.
+  # ─── Notification hook ───
+  # Notify on: gate passed, circuit breaker (all_complete handled below)
+  if [[ "$final_status" == "done" && "$task_id" == *".G" ]]; then
+    task_title=$(echo "$task_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('title',''))" 2>/dev/null || echo "$task_id")
+    bash "$SCRIPTS_DIR/notify.sh" "$INSTANCE_DIR" "gate_passed" "$task_title" &
+  fi
 
   sleep $SLEEP_INTERVAL
 done
@@ -679,7 +695,7 @@ print('yes' if total > 0 and done + escalated == total else 'no')
     log "All tasks complete. Writing completion marker."
     echo "{\"event\":\"completed\",\"ts\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"instance\":\"$INSTANCE_NAME\"}" > "$INSTANCE_DIR/logs/completed.json"
     python3 "$SCRIPTS_DIR/log_task.py" "$INSTANCE_DIR" "worker" "auto_stop" '{"reason":"all_tasks_complete"}' 2>/dev/null || true
-    bash "$SCRIPTS_DIR/notify-discord.sh" "$INSTANCE_DIR" "all_complete" "" &
+    bash "$SCRIPTS_DIR/notify.sh" "$INSTANCE_DIR" "all_complete" "" &
     # Skip archive for recurring instances
     is_recurring=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('recurring', False))" 2>/dev/null || echo "False")
     if [[ "$is_recurring" != "True" ]]; then
