@@ -1,0 +1,73 @@
+{
+  "project_name": "fog-parser",
+  "plan_version": 1,
+  "phase": "research",
+  "tasks": [
+    {
+      "id": "0.1",
+      "name": "research-fog-format",
+      "prompt": "研究 Fog of World 数据格式。\n\n1. 用 web_search 搜索 'Fog of World data export format' 和 'Fog of World iCloud sync file format'\n2. 搜索 'Fog of World GPX export' 和 'Fog of World API'\n3. 分析 iCloud sync 文件：\n   python3 -c \"import zlib; data=open('$HOME/Library/Mobile Documents/iCloud~com~ollix~FogOfWorld/Documents/Sync/bd29loljsrwm','rb').read(); print(zlib.decompress(data)[:2000])\"\n4. 记录发现到 /Users/clawz/.openclaw/workspace-log/docs/fog-format.md\n5. git add -A && git commit -m 'fog-parser: research data format' && git push",
+      "deps": [],
+      "timeout": 120,
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
+    },
+    {
+      "id": "0.2",
+      "name": "parse-sync-data",
+      "prompt": "解析 Fog of World iCloud sync 数据。\n\n1. 读取 docs/fog-format.md 了解已知信息\n2. 深入分析 zlib 解压后的数据结构\n3. 搜索更多文件：find ~/Library -iname '*fog*' -o -iname '*ollix*' 2>/dev/null\n4. 如果 sync 数据不足，记录需要 Caton 做什么（如手动导出 GPX）\n5. 更新 docs/fog-format.md\n6. git add -A && git commit && git push",
+      "deps": [
+        "0.1"
+      ],
+      "timeout": 120,
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
+    },
+    {
+      "id": "0.3",
+      "name": "write-parser",
+      "prompt": "编写 Fog of World 数据解析脚本。\n\n1. 读取 docs/fog-format.md\n2. 写 Python 脚本 /Users/clawz/.openclaw/workspace-log/scripts/fog-parser.py\n   - 输入：Fog of World 导出文件路径\n   - 输出：JSON 格式的位置时间线 [{start, end, lat, lon, place_name}]\n   - 处理时区：读取 /Users/clawz/.openclaw/workspace/timezone.json\n3. 测试运行\n4. git add -A && git commit -m 'fog-parser: add parser script' && git push",
+      "deps": [
+        "0.2"
+      ],
+      "timeout": 120,
+      "status": "pending",
+      "attempts": 0,
+      "runner": "claude"
+    },
+    {
+      "id": "0.4",
+      "name": "compare-with-arc",
+      "prompt": "对比 Fog of World 与 Arc Timeline 数据。\n\n1. 用 fog-parser.py 解析一天的 FoW 数据\n2. 用 Arc Timeline 同一天数据：gunzip -c ~/Library/Mobile\\ Documents/iCloud~com~bigpaua~LearnerCoacher/Documents/Export/JSON/Daily/2026-03-16.json.gz\n3. 对比：精度、频率、停留点识别、覆盖率\n4. 写对比报告 docs/fog-vs-arc.md\n5. git add -A && git commit && git push",
+      "deps": [
+        "0.3"
+      ],
+      "timeout": 120,
+      "status": "pending",
+      "attempts": 0,
+      "runner": "claude"
+    },
+    {
+      "id": "0.G",
+      "name": "report",
+      "prompt": "汇总 fog-parser 研究结果。\n\n1. 读取 docs/fog-format.md 和 docs/fog-vs-arc.md\n2. 用 message tool 发送 Components V2 卡片到 Discord #log：\n   - action=send, channel=discord, target=1477875298715570186\n   - mention <@803422039977099284>\n   - 包含：数据格式发现、解析结果、与 Arc 对比、建议\n3. 返回 NO_REPLY",
+      "deps": [
+        "0.4"
+      ],
+      "timeout": 60,
+      "status": "pending",
+      "attempts": 0,
+      "runner": "agent"
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "pending": 5,
+    "in_progress": 0,
+    "done": 0,
+    "failed": 0,
+    "escalated": 0
+  }
+}
