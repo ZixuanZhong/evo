@@ -110,14 +110,27 @@ Git commit command.
   "codex_workdir": "/path/to/project",
   "fallback_runner": "claude",
   "claude_model": "opus",
-  "worker_timeout": 300
+  "worker_timeout": 300,
+  "notify_channel": "feishu",
+  "notify_target": "user:ou_xxx"
 }
 ```
+
+### 通知配置
+
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| `notify_channel` | `feishu` / `discord` | 通知渠道，不设则回退到 discord（通过 env） |
+| `notify_target` | `user:ou_xxx` / channel ID | feishu 用 `user:open_id`，discord 用 channel ID |
+
+通知会在 gate 通过、全部完成、circuit breaker 时自动触发。
 
 ## 注意事项
 
 - `evo plan` 是确定性 parser，不调用 LLM。格式错误会直接报错。
 - Gate 条件用 `>=` 不用 `==`
 - Worker timeout 默认 300s，大 task 要拆分
-- `evo reset` 只清 task 状态，不删 output 文件
+- `evo reset` 会清 task 状态 + output 文件 + **agent session locks**（不会遗留 stale locks）
 - 每个 phase 结束后应有 Git commit task
+- **Agent runner 有效并发 = 1**：`agent` runner 因为 session file lock 限制，多 worker 会排队而非并行。全 agent 的 instance 用 `-w 1`。`claude`/`codex`/`gemini` runner 不受此限制，可多 worker 并行。
+- SPEC.md 中的 task description 内如果有 markdown code block（` ``` `），可能干扰 `spec2tasks.py` 解析。建议：(1) 用文字描述文档结构而非嵌入完整模板 (2) 如果 parser 丢 task，手动编辑 tasks.json 补上
