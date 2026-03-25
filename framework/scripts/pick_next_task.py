@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 STALE_THRESHOLD = 900  # 15 minutes (accounts for openclaw agent startup overhead)
 MAX_ATTEMPTS = 5
+FAILED_RETRY_COOLDOWN = 120  # 2 minutes before auto-retrying a failed task
 
 
 def load_tasks(path):
@@ -70,6 +71,35 @@ def l0_75_auto_escalate(tasks):
             trigger_planner = True
             print(f"[L0.75] Escalated task {t['id']}: {t['title']} (attempts={t['attempts']})", file=sys.stderr)
     return changed, trigger_planner
+
+
+def l0_25_failed_retry(tasks):
+    """L0.25: Auto-retry failed tasks after cooldown if attempts < MAX_ATTEMPTS.
+
+    Without this, a single failed gate blocks all downstream tasks and workers
+    idle forever because L0.5 only fires when *all* pending tasks are directly
+    blocked by a failed dep (transitive blocks are missed).
+
+    This mechanism simply resets any failed task back to pending after a short
+    cooldown, giving it another chance.  MAX_ATTEMPTS still caps total retries.
+    """
+    now = time.time()
+    changed = False
+    for t in tasks:
+        if t["status"] != "failed":
+            continue
+        if t.get("attempts", 0) >= MAX_ATTEMPTS:
+            continue
+        # Use started_at (last attempt start) or fall back to a short cooldown
+        last_attempt = parse_ts(t.get("started_at")) or parse_ts(t.get("failed_at"))
+        if last_attempt > 0 and (now - last_attempt) < FAILED_RETRY_COOLDOWN:
+            continue
+        t["status"] = "pending"
+        t["error"] = f"L0.25: auto-retry after cooldown (attempt {t.get('attempts', 0)}/{MAX_ATTEMPTS})"
+        t["started_at"] = None
+        changed = True
+        print(f"[L0.25] Auto-retry failed task {t['id']}: {t['title']} (attempt {t.get('attempts', 0)})", file=sys.stderr)
+    return changed
 
 
 def l0_5_dependency_deadlock(tasks):
@@ -196,6 +226,10 @@ def main():
 
         # L0: stale reset
         if l0_stale_reset(tasks):
+            changed = True
+
+        # L0.25: auto-retry failed tasks after cooldown
+        if l0_25_failed_retry(tasks):
             changed = True
 
         # L0.5: dependency deadlock

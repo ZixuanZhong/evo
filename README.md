@@ -21,9 +21,9 @@ SPEC.md → Parser/Planner → tasks.json → Worker Loop → Output Files
 - 🔄 **Phased execution** — tasks organized by phase, gates control progression
 - 🔀 **Multiple runner types** — `agent` (full tools, API tokens), `claude` / `codex` / `gemini` (coding CLIs, subscription plans)
 - ⚡ **Parallel workers** — run multiple worker loops concurrently to speed up independent tasks
-- 🛡️ **Anti-stuck mechanisms** — L0 stale reset, L0.5 deadlock breaker, L0.75 auto-escalation
+- 🛡️ **Anti-stuck mechanisms** — L0 stale reset, L0.25 failed auto-retry, L0.5 deadlock breaker, L0.75 auto-escalation
 - 📊 **Budget control** — daily task limits prevent runaway costs
-- 🔔 **Discord notifications** — gate passes, completions, circuit breakers (optional)
+- 🔔 **Multi-channel notifications** — gate passes, completions, circuit breakers via Discord or Feishu (auto-routed by `notify_channel` in state.json)
 - 📦 **GitHub archiving** — auto-archive completed instances (optional)
 - 🔁 **Recurring instances** — template-based reset for nightly/periodic tasks
 - 📋 **Structured logging** — JSONL task logs + worker logs with rotation
@@ -261,7 +261,7 @@ If `file-list.txt` has 12 items with `batch_size: 5`, the worker automatically c
 | `evo status --json` | Machine-readable status output |
 | `evo logs <name> [--follow] [--worker ID]` | View worker logs |
 | `evo plan <name>` | Run the AI planner |
-| `evo reset <name> [--force]` | Reset tasks to pending |
+| `evo reset <name> [--force]` | Reset tasks to pending (also cleans agent session locks) |
 | `evo integrate <name>` | Show output routing suggestions |
 | `evo health` | System health check (JSON) |
 | `evo destroy <name>` | Stop + move to trash |
@@ -274,7 +274,7 @@ If `file-list.txt` has 12 items with `batch_size: 5`, the worker automatically c
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EVO_ROOT` | `~/.openclaw/evo` | Base directory |
-| `EVO_DISCORD_CHANNEL` | _(none)_ | Discord channel ID for notifications |
+| `EVO_DISCORD_CHANNEL` | _(none)_ | Discord channel ID for notifications (fallback) |
 | `EVO_MENTION` | _(none)_ | Discord mention, e.g. `<@USER_ID>` |
 | `EVO_ARCHIVE_REPO` | _(none)_ | GitHub repo for archiving completed instances |
 | `OPENCLAW_WORKSPACE` | `~/.openclaw/workspace` | OpenClaw workspace path |
@@ -293,7 +293,10 @@ Set these in `~/.openclaw/evo/.env` (auto-loaded by CLI).
 | `worker_agent` | `evo` | OpenClaw agent ID for `agent` runner |
 | `worker_timeout` | `600` | Timeout per task (seconds) |
 | `codex_workdir` | _(none)_ | Working directory for `codex` runner (project root) |
-| `workers` | `1` | Number of parallel worker loops |
+| `fallback_runner` | _(none)_ | Fallback runner when primary hits rate limits (e.g., `claude`) |
+| `workers` | `1` | Number of parallel worker loops (see concurrency notes below) |
+| `notify_channel` | _(none)_ | Notification channel: `feishu` or `discord` (falls back to discord via env) |
+| `notify_target` | _(none)_ | Notification target: `user:ou_xxx` (feishu) or channel ID (discord) |
 | `budget_daily` | `50` | Max tasks per day |
 | `recurring` | `false` | Whether instance supports `evo reset` from template |
 
@@ -350,7 +353,8 @@ Sandboxed runners (`codex`, `gemini`) cannot write back to the evo instance dire
 │   │   ├── reporter.sh           # Status reporting
 │   │   ├── health_check.sh       # System health (JSON)
 │   │   ├── integrate.sh          # Output routing suggestions
-│   │   ├── notify-discord.sh     # Discord notifications
+│   │   ├── notify.sh              # Multi-channel notifications (feishu/discord)
+│   │   ├── notify-discord.sh     # Discord notifications (legacy, called by notify.sh)
 │   │   └── archive-to-github.sh  # GitHub archiving
 │   ├── skills/
 │   │   └── evo/
@@ -387,6 +391,8 @@ evo start my-research --workers 3
 
 Each worker independently picks tasks from the queue (`pick_next_task.py` uses file locking for safe concurrent access). Workers are fully crash-isolated — if one hangs or fails, others keep running.
 
+> **⚠️ Agent runner concurrency limit**: The `agent` runner (OpenClaw agent) uses per-agent mutex locking (`flock`) to prevent session file lock contention. Multiple workers running `agent` tasks will **queue sequentially**, not run in parallel. Parallel workers only speed up `claude`/`codex`/`gemini` runners. For instances where all tasks use `agent` runner, `-w 1` is optimal — higher values add overhead without improving throughput.
+
 ```bash
 # View status — shows all workers
 evo status my-research
@@ -408,11 +414,13 @@ evo stop my-research
 
 | Workers | Best for |
 |---------|----------|
-| 1 (default) | Sequential workflows, low-cost, simple |
-| 2-3 | Instances with many independent tasks in the same phase |
-| 4+ | Large batch processing with `auto_split` |
+| 1 (default) | Sequential workflows, low-cost, simple. **Required for all-agent-runner instances.** |
+| 2-3 | Instances with many independent `claude`/`codex`/`gemini` tasks in the same phase |
+| 4+ | Large batch processing with `auto_split` (non-agent runners) |
 
 > **Note**: More workers doesn't help if tasks are strictly sequential (each depends on the previous). The speedup comes from independent tasks that can run in parallel.
+>
+> **Note**: The `agent` runner has an effective concurrency of 1 due to session file locking. Use `claude`/`codex`/`gemini` runners for parallel speedup.
 
 ## Auto-Split: Dynamic Task Expansion
 
@@ -491,9 +499,19 @@ python3 ~/.openclaw/evo/framework/scripts/spec2tasks.py \
 | Level | Trigger | Action |
 |-------|---------|--------|
 | L0 | Task `in_progress` > 15 min | Reset to `pending`, increment attempts |
+| L0.25 | Task `failed` for > 2 min, attempts < 5 | Auto-retry: reset to `pending` after cooldown |
 | L0.5 | All pending tasks blocked by failed deps | Reset failed deps or trigger planner |
 | L0.75 | Task attempts ≥ 5 | Auto-escalate, trigger planner to redesign |
 | Circuit Breaker | 5 consecutive failures | Pause 1 hour, notify Discord |
+
+### L0.25: Failed Task Auto-Retry
+
+Without L0.25, a single failed gate could block all downstream tasks indefinitely — workers would idle-loop because L0.5 only fires when *all* pending tasks are *directly* blocked by a failed dep (transitive blocks through pending intermediaries are missed).
+
+L0.25 solves this by simply retrying any failed task after a short cooldown (2 minutes), as long as the attempt count hasn't reached the maximum (5). This covers:
+- Gate failures that may pass on retry (e.g., after upstream test fixes)
+- Transient runner errors (network, rate limits, timeouts)
+- Tasks that failed due to concurrent modification by parallel workers
 
 ## License
 

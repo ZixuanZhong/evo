@@ -460,6 +460,19 @@ print(f'Reset {total} tasks to pending (in-place)')
   find "$inst_dir" -maxdepth 1 -name "*.md" ! -name "SPEC.md" ! -name "README.md" -delete 2>/dev/null
   rm -f "$inst_dir/logs/task-log.jsonl" 2>/dev/null
 
+  # Clean agent session locks and stale session files (prevents lock contention on restart)
+  local worker_agent
+  worker_agent=$(python3 -c "import json; print(json.load(open('$inst_dir/state.json')).get('worker_agent', 'evo'))" 2>/dev/null || echo "evo")
+  local agent_sessions="$HOME/.openclaw/agents/${worker_agent}/sessions"
+  if [[ -d "$agent_sessions" ]]; then
+    find "$agent_sessions" -name "*.lock" -delete 2>/dev/null || true
+    # Clean session files from this instance (match by instance name in session id)
+    find "$agent_sessions" -name "evo-${name}-*.jsonl" -delete 2>/dev/null || true
+    echo "Cleaned agent session locks and instance session files"
+  fi
+  # Clean agent mutex locks
+  rm -f "$FRAMEWORK_DIR/../.locks/agent-${worker_agent}.lock" 2>/dev/null
+
   # Set active = false (start will set true)
   python3 -c "
 import json, tempfile, os
