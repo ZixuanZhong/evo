@@ -492,14 +492,35 @@ Working directory: $INSTANCE_DIR"
       # ─── openclaw agent: full tools (web_search, web_fetch, memory, plugins) — uses notac tokens ───
       # IMPORTANT: agent runner uses a per-agent mutex lock to prevent session file lock contention.
       # Multiple workers running agent tasks concurrently will deadlock on the session file.
-      # The flock ensures only one agent task runs at a time; others queue and wait.
-      AGENT_LOCK_FILE="$EVO_ROOT/.locks/agent-${WORKER_AGENT}.lock"
-      mkdir -p "$(dirname "$AGENT_LOCK_FILE")"
+      # Ensure only one agent task runs at a time using mkdir atomic lock (macOS compatible).
+      AGENT_LOCK_DIR="$EVO_ROOT/.locks/agent-${WORKER_AGENT}.lk"
+      mkdir -p "$(dirname "$AGENT_LOCK_DIR")"
       log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
-      log "[agent-lock] Acquiring exclusive lock: $AGENT_LOCK_FILE"
+      log "[agent-lock] Acquiring exclusive lock: $AGENT_LOCK_DIR"
       SESSION_ID="evo-${INSTANCE_NAME}-${task_id}-$(date +%s)"
       (
-        flock -w "$((WORKER_TIMEOUT + 60))" 200 || { echo "[agent-lock] Failed to acquire lock after timeout" >> "$LOG_FILE"; exit 1; }
+        # mkdir-based lock: atomic on all POSIX systems (macOS + Linux)
+        LOCK_WAIT=$((WORKER_TIMEOUT + 60))
+        LOCK_START=$(date +%s)
+        while ! mkdir "$AGENT_LOCK_DIR" 2>/dev/null; do
+          # Check if lock is stale (holder died)
+          if [[ -f "$AGENT_LOCK_DIR/pid" ]]; then
+            LOCK_PID=$(cat "$AGENT_LOCK_DIR/pid" 2>/dev/null)
+            if [[ -n "$LOCK_PID" ]] && ! kill -0 "$LOCK_PID" 2>/dev/null; then
+              log "[agent-lock] Stale lock (PID $LOCK_PID dead), removing"
+              rm -rf "$AGENT_LOCK_DIR"
+              continue
+            fi
+          fi
+          ELAPSED=$(( $(date +%s) - LOCK_START ))
+          if [[ $ELAPSED -ge $LOCK_WAIT ]]; then
+            echo "[agent-lock] Failed to acquire lock after ${LOCK_WAIT}s timeout" >> "$LOG_FILE"
+            exit 1
+          fi
+          sleep 2
+        done
+        echo $$ > "$AGENT_LOCK_DIR/pid"
+        trap 'rm -rf "$AGENT_LOCK_DIR"' EXIT
         log "[agent-lock] Lock acquired, starting agent"
         # Clean stale session locks inside the critical section
         find "$HOME/.openclaw/agents/${WORKER_AGENT}/sessions/" -name "*.lock" -delete 2>/dev/null || true
@@ -509,7 +530,7 @@ Working directory: $INSTANCE_DIR"
           --message "You are a research Worker in an Evolution Loop. Read the task prompt file and execute it: $PROMPT_FILE" \
           --timeout "$WORKER_TIMEOUT" \
           2>>"$LOG_FILE" >> "$LOG_FILE"
-      ) 200>"$AGENT_LOCK_FILE" &
+      ) &
       WORKER_PID=$!
       ;;
   esac
