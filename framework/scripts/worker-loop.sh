@@ -492,34 +492,29 @@ Working directory: $INSTANCE_DIR"
       # ─── openclaw agent: full tools (web_search, web_fetch, memory, plugins) — uses notac tokens ───
       # IMPORTANT: agent runner uses a per-agent mutex lock to prevent session file lock contention.
       # Multiple workers running agent tasks concurrently will deadlock on the session file.
-      # Ensure only one agent task runs at a time using mkdir atomic lock (macOS compatible).
+      # Uses mkdir-based lock (atomic on all POSIX systems including macOS, no flock dependency).
       AGENT_LOCK_DIR="$EVO_ROOT/.locks/agent-${WORKER_AGENT}.lk"
-      mkdir -p "$(dirname "$AGENT_LOCK_DIR")"
       log "Executing via openclaw agent --agent $WORKER_AGENT (runner=agent), model: $WORKER_MODEL, timeout: ${WORKER_TIMEOUT}s (hard: ${HARD_TIMEOUT}s)"
-      log "[agent-lock] Acquiring exclusive lock: $AGENT_LOCK_DIR"
       SESSION_ID="evo-${INSTANCE_NAME}-${task_id}-$(date +%s)"
       (
-        # mkdir-based lock: atomic on all POSIX systems (macOS + Linux)
-        LOCK_WAIT=$((WORKER_TIMEOUT + 60))
-        LOCK_START=$(date +%s)
+        # Acquire lock: mkdir is atomic. Spin-wait with timeout.
+        _lock_deadline=$(($(date +%s) + WORKER_TIMEOUT + 60))
         while ! mkdir "$AGENT_LOCK_DIR" 2>/dev/null; do
-          # Check if lock is stale (holder died)
-          if [[ -f "$AGENT_LOCK_DIR/pid" ]]; then
-            LOCK_PID=$(cat "$AGENT_LOCK_DIR/pid" 2>/dev/null)
-            if [[ -n "$LOCK_PID" ]] && ! kill -0 "$LOCK_PID" 2>/dev/null; then
-              log "[agent-lock] Stale lock (PID $LOCK_PID dead), removing"
-              rm -rf "$AGENT_LOCK_DIR"
-              continue
-            fi
-          fi
-          ELAPSED=$(( $(date +%s) - LOCK_START ))
-          if [[ $ELAPSED -ge $LOCK_WAIT ]]; then
-            echo "[agent-lock] Failed to acquire lock after ${LOCK_WAIT}s timeout" >> "$LOG_FILE"
+          if [[ $(date +%s) -ge $_lock_deadline ]]; then
+            echo "[agent-lock] Failed to acquire lock after timeout" >> "$LOG_FILE"
             exit 1
+          fi
+          # Clean stale lock (older than 20 min = likely dead process)
+          if [[ -d "$AGENT_LOCK_DIR" ]]; then
+            _lock_age=$(( $(date +%s) - $(stat -f %m "$AGENT_LOCK_DIR" 2>/dev/null || echo "0") ))
+            if [[ $_lock_age -gt 1200 ]]; then
+              log "[agent-lock] Removing stale lock (age=${_lock_age}s)"
+              rm -rf "$AGENT_LOCK_DIR"
+            fi
           fi
           sleep 2
         done
-        echo $$ > "$AGENT_LOCK_DIR/pid"
+        # Ensure lock cleanup on exit
         trap 'rm -rf "$AGENT_LOCK_DIR"' EXIT
         log "[agent-lock] Lock acquired, starting agent"
         # Clean stale session locks inside the critical section
